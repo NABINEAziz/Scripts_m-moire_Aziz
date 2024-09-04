@@ -1,0 +1,2973 @@
+---
+title: "Élaboration de tarifs de cubage et équations allométriques pour *Acacia mangium*"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+  word_document:
+    toc: true
+    number_sections: true
+    fig_width: 7
+    fig_height: 7
+  html_document: 
+    toc: true
+    toc_float: true
+    number_sections: true
+link-citations: yes
+bibliography: bib/biblio.bib
+biblio-style: bib/jae.bst
+csl: bib/journal-of-applied-ecology.csl
+date: "`r Sys.Date()`"
+always_allow_html: true
+header-includes: 
+  \usepackage{booktabs} 
+  \usepackage{longtable} 
+  \usepackage{array} 
+  \usepackage{multirow}
+  \usepackage[table]{xcolor}
+  \usepackage{wrapfig} 
+  \usepackage{float} 
+  \floatplacement{figure}{H}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      include=TRUE,
+                      fig.pos ="H",
+                      fig.width = 8,
+                      fig.height = 8,
+                      out.width = '75%',
+                      highlight = TRUE)
+```
+
+# Objectif
+
+On va analyser les données afin d'élaborer des tarifs de cubage et des équations allométriques spécifiques à l’espèce *Acacia mangium*, plantée dans les domaines de Forest Neutral Congo (BaCaSi) et de la SPF2B (Ibina et Oka 2). L’utilisation des équations allométriques et des tarifs de cubage élaborés et ajustés localement permettra d’améliorer l’estimation, respectivement de la biomasse et des volumes des peuplements concernés. En effet d’après les revues bibliographiques, concernant les équations allométriques et tarifs de cubage fréquemment utilisés, ceux-ci comportent de nombreuses imprécisions, sources de biais sur les résultats obtenus [@Loubota2016, @Sebrala2022].
+Les équations produites seront définies sur l’ensemble des domaines considérés (BaCaSi, Ibina et Oka 2), dont les emplacements sont visibles sur la carte ci-dessous : 
+
+![Localisation domaines](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/localisation_domaines.png){height=700px}
+
+# Données collectées 
+
+Les données préexistantes sur les structures des peuplements des domaines étudiés ont été utilisées pour sélectionner les plages de DHP à échantillonner. En effet, avant la collecte des données, il convient d'évaluer les données existantes sur ces peuplements et de répartir les valeurs de DHP en quatre classes (@Walker2016).  
+
+- Classe 1 : arbres de DHP inférieur au premier quartile de la fourchette de DHP des arbres de l’ensemble des peuplements étudiés ([4 ; 6.5]).  
+- Classe 2 : arbres se situant entre le quartile inférieur et la médiane de la fourchette de DHP (]6.5 ; 9]).  
+- Classe 3 : arbres se situant entre la médiane et le quartile supérieur de l'intervalle de DHP 
+(]9 ; 11.5]).  
+-	Classe 4 : arbres dépassant le quartile supérieur de la plage de DHP (]11.5 ; 23.8]).  
+
+
+## Localisation des arbres abattus  
+
+### Ibina 
+
+![15 arbres à Ibina](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/A3_Ibina_Eq_allom_2024_v2.png){height=700px}
+
+### OKA 2
+
+![19 arbres à OKA 2](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/A3_OKA2_eq allom 2024_v1.png){height=700px}
+
+### BaCaSi
+
+![10 arbres à BaCaSi zone 1](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/A3_RF_Lefini_Total_Eq_allom_2024_Zone1_v1.png){height=700px}
+
+![10 arbres à BaCaSi zone 2](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/A3_RF_Lefini_Total_Eq_allom_2024_Zone2_v1.png){height=700px}
+
+## Caractéristiques des arbres abattus 
+
+```{r data-import, echo=FALSE, include=FALSE}
+library(readxl)
+library(knitr)
+library(dplyr)
+
+dendro <- read_excel("D:/STAGE 2024 FRM/ANALYSES STATISTIQUES/Taff avec Jeanne/13_08_2024/Saisie_Equa_Allom2024_Arbres sur pied_V7.xlsx", sheet="Post_abattage_Dendro", skip=1)
+field_data <- read_excel("D:/STAGE 2024 FRM/ANALYSES STATISTIQUES/Taff avec Jeanne/13_08_2024/Saisie_Equa_Allom2024_Arbres sur pied_V7.xlsx", sheet="Pré-abattage_Data", skip=1)
+```
+
+
+```{r data-View, echo=FALSE, include=TRUE, eval=TRUE}
+# Moyenne des trois hauteurs totales des arbres mesurées avant abattage
+field_data$H_t <- rowMeans(field_data[,c("Ht 1 (m)",
+                                         "Ht 2 (m)",
+                                         "Ht 3 (m)")])
+field_data$sd_H_tree <- apply(field_data[,c("Ht 1 (m)",
+                                         "Ht 2 (m)",
+                                         "Ht 3 (m)")], 
+                   1, sd)
+
+colnames(field_data)[6] <- "ID_arbre"
+# Hauteur de fût des arbres mesurée avant abattage
+field_data$H_f <- field_data$`Hf (m)...24`
+# Profondeur de couronne des arbres mesurée avant abattage
+field_data$H_c <- field_data$H_t - field_data$H_f
+```
+
+### Evaluation de la nécessité de mesurer la hauteur selon trois points de vue différents 
+
+```{r boxplot-H}
+library(ggplot2)
+dendro <- dplyr::left_join(dendro,
+                    field_data[,c("ID_arbre","Ht 1 (m)", "Ht 2 (m)",
+                                  "Ht 3 (m)", "H_t", "H_f", "H_c", "sd_H_tree")],
+                    by="ID_arbre")
+# Box plots des différentes mesures de hauteur
+
+get_box_stats <- function(y, upper_limit =1.15*max(dendro[,c("Ht 1 (m)",
+                                         "Ht 2 (m)",
+                                         "Ht 3 (m)")])) {
+  return(data.frame(
+    y = 0.97 * upper_limit,
+    label = paste(
+      "Count =", length(y), "\n",
+      "Mean =", round(mean(y), 2), "\n",
+      "Sd =", round(sd(y), 2), "\n",
+      "Max =", round(max(y), 2), "\n"
+    )
+  ))
+}
+data_comp_H <- data.frame(H=c(as.matrix(dendro[,c("Ht 1 (m)","Ht 2 (m)","Ht 3 (m)",
+                              "Hauteur_totale_m")])),
+                          Mesure=rep(c("1", "2", "3", "post-abattage"),
+                                     each=nrow(field_data)))
+# Créer un Boxplots avec des p-values du test t
+Boxplot_H <- ggplot(data_comp_H, aes(x=Mesure, y=H, fill=Mesure)) +
+  ggtitle("Comparaison des mesures de hauteur sur pied selon trois points de vue différents", ) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point",
+               shape = 18, size = 2.5, color = "#FC4E07") +
+  theme(legend.title = element_text(size = 15),
+        legend.text = element_text(size = 14)) +
+  ylab("Hauteur totale (m)") + xlab("Mesure") +
+  stat_summary(fun.data = get_box_stats, geom = "text",
+               hjust = 0.5, vjust = 0.9, size=3) 
+Boxplot_H
+```
+
+On constate, sur la figure ci-dessus, que les différentes mesures de la hauteur de chaque arbre sont très similaires entre elles et correspondent aux hauteurs mesurées plus précisément après l'abattage.
+
+```{r t-test-H}
+library(ggpubr)
+library(rstatix)
+library(ggplot2)
+stat.test <- data_comp_H %>%
+  t_test(H ~ Mesure, p.adjust.method = "bonferroni")
+# Supprimer les colonnes non nécessaires et afficher les résultats
+stat.test %>% select(-.y., -statistic, -df)
+```
+Les résultats du test statistique ci-dessus montrent que les mesures de hauteur selon les différents points de vue, ne sont pas significativement différentes. On pourra donc à l'avenir se contenter de mesurer la hauteur une seule fois. 
+
+### Comparaison des hauteurs mesurées avant et après abattage 
+
+```{r comp_H, echo=FALSE, include=TRUE}
+
+ggplot(data=dendro, aes(x=H_t,
+                        y=Hauteur_totale_m))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red") +
+  geom_errorbar(aes(ymin = Hauteur_totale_m - sd_H_tree,
+                    ymax = Hauteur_totale_m + sd_H_tree),
+                width = 0.2, color="blue") +
+  ggtitle(label=("Hauteur totale mesurées avant et après abattage")) +
+  labs(x = "H_t avant (m)",
+       y = "H_t après (m)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+ggplot(data=dendro, aes(x=H_f,
+                        y=`Hauteur_du_fût _m`))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red") +
+  ggtitle(label=("Hauteur de fût mesurées avant et après abattage")) +
+  labs(x = "H_f avant (m)",
+       y = "H_f après (m)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+
+ggplot(data=dendro, aes(x=H_c,
+                        y=Profondeur_couronne_m))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red") +
+  ggtitle(label=("Profondeur de couronne mesurées avant et après abattage")) +
+  labs(x = "H_c avant (m)",
+       y = "H_c après (m)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+```
+
+On constate que les hauteurs totales mesurées avant abattage correspondent bien à celles mesurées après abattage. Néanmoins, on constate que les écarts types entre les trois hauteurs totales de chaque arbre, mesurées sur le terrain selon différents points de vue, représentés en bleu sur le graphique, sont assez importants en particulier pour les arbres les plus grands. Ce qui signifie que les trois mesures de hauteurs donnent des résultats assez différents. 
+Cependant les hauteurs de fût mesurées après abattage et les profondeurs de couronne déduites de ces valeurs, sont assez éloignées des valeurs mesurées au sol après abattage.
+Ce qui s'explique par la difficulté de distinguer la délimitation entre le fût et le houppier des arbres sur pied.
+
+```{r test-bivarié-H_t}
+
+```
+
+
+### Comparaison des données entre les différents domaines
+
+#### Représentations graphiques
+
+```{r descriptive-plots}
+data <- data.frame(Domaine=dendro$Domaine, ID_parcelle=dendro$ID_parcelle,
+                   ID_arbre=dendro$ID_arbre, N_tiges=dendro$Nb_Tiges, 
+                   DHP=dendro$DHP_cm, H_f=dendro$H_f,
+                   H_t=dendro$H_t,
+                   C_dia=dendro$`Diametre couronne_m`,
+                   I_c=dendro$Classe_couronne,
+                   H_c=dendro$H_c,
+                   S_c=dendro$Surface_couronne_m2, 
+                   V_c=dendro$`Volume_ couronne_m³`,
+                   N_arbres=dendro$N_arbres_rayon_4m,
+                   Age=dendro$Age_mois,
+                   Vt_bois=dendro$`Vt_bois_m³`)
+
+data$Campagne <- paste0(data$Domaine, c(rep("-2018", 15),
+                                        paste0("-20", substr(data$ID_parcelle[
+                                          data$Domaine!="Ibina"], 1,2))))
+
+# Boxplots
+library(ggplot2)
+# Box plots by stratum
+get_box_stats <- function(y, upper_limit = max(data$DHP)*1.15) {
+  return(data.frame(
+    y = 0.97 * upper_limit,
+    label = paste(
+      "Count =", length(y), "\n",
+      "Mean =", round(mean(y), 2), "\n",
+      "Sd =", round(sd(y), 2), "\n",
+      "Max =", round(max(y), 2), "\n"
+    )
+  ))
+}
+Boxplot_DHP <- ggplot(data, aes(x=Campagne, y=DHP, fill=Campagne)) +
+  ggtitle("Comparaison des structures de DHP entre les domaines", ) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point",
+               shape = 18, size = 2.5, color = "#FC4E07") +
+  theme(legend.title = element_text(size = 15),
+        legend.text = element_text(size = 14)) +
+  ylab("DHP (cm)") + xlab("Campagne") +
+  stat_summary(fun.data = get_box_stats, geom = "text",
+               hjust = 0.5, vjust = 0.9, size=5) 
+Boxplot_DHP
+
+Boxplot_H <- ggplot(data, aes(x=Campagne, y=H_t, fill=Campagne)) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point",
+               shape = 18, size = 2.5, color = "#FC4E07") +
+  ggtitle("Comparaison des hauteurs totales entre les domaines",
+          ) +
+  theme(legend.title = element_text(size = 15),
+        legend.text = element_text(size = 14)) +
+  ylab("Hauteur totale (m)") + xlab("Campagne") +
+  stat_summary(fun.data = get_box_stats, geom = "text",
+               hjust = 0.5, vjust = 0.9, size=5) 
+Boxplot_H
+
+data_21 <- data[data$Age==30, ]
+data_21$Zone <- paste0(data_21$Campagne,"-Zone_",
+                       substr(data_21$ID_parcelle,3,3))
+data_21$Zone[data_21$Domaine=="Oka 2"] <- data_21$Campagne[data_21$Domaine=="Oka 2"]
+Boxplot_DHP_21 <- ggplot(data_21,
+                         aes(x=Zone, y=DHP, fill=Zone)) +
+  ggtitle("Comparaison des structures de DHP entre les plantations de 2021", ) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point",
+               shape = 18, size = 2.5, color = "#FC4E07") +
+  theme(legend.title = element_text(size = 15),
+        legend.text = element_text(size = 14)) +
+  ylab("DHP (cm)") + xlab("Zone") +
+  stat_summary(fun.data = get_box_stats, geom = "text",
+               hjust = 0.5, vjust = 0.9, size=5) 
+Boxplot_DHP_21
+
+Boxplot_H_21 <- ggplot(data_21,
+                       aes(x=Zone, y=H_t, fill=Zone)) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point",
+               shape = 18, size = 2.5, color = "#FC4E07") +
+  ggtitle("Comparaison des hauteurs totales entre les plantations de 2021" ) +
+  theme(legend.title = element_text(size = 15),
+        legend.text = element_text(size = 14)) +
+  ylab("Hauteur totale (m)") + xlab("Zone") +
+  stat_summary(fun.data = get_box_stats, geom = "text",
+               hjust = 0.5, vjust = 0.9, size=5) 
+Boxplot_H_21
+```
+  
+  
+Ces graphiques montrent que la distribution des DHP entre les domaines est relativement uniforme, ce qui s'explique par le plan d'échantillonnage mis en oeuvre qui fixait un nombre d'arbre par classe de DHP à prélever par domaine.
+Cependant les hauteurs totales des arbres diffèrent nettement entre les domaines. 
+Le domaine d'Ibina, se distingue nettement des autres avec une hauteur moyenne de 14,58m.
+Les arbres y sont plus grand que sur les autres domaines car ils ont été planté en 2018, bien avant ceux de BaCaSi plantés en 2021 et Oka 2 plantés en 2020 et 2021. 
+D'autre part on constate sur le dernier graphique que, parmi les arbres plantés en 2021, ceux de la zone 2 du domaine BaCaSi présentent des hauteurs nettement inférieures aux autres, avec une hauteur moyenne de 6.26m alors que les arbres s'élèvent à 9,22m sur la zone 1 de BaCaSi et 8,4m à Oka 2 en moyenne. 
+Ces différences s'expliquent par le sol très sableux et pauvre en terre noire de la zone 2 du domaine BaCaSi qui la rend moins fertile et influence négativement la croissance des arbres. 
+
+#### Analyse de variance (ANOVA)
+
+On réalise une analyse de variance ou ANOVA sur le volume de bois calculé pour chaque arbre dans les différents domaines. L’ANOVA est une technique de statistique inférentielle élaborée pour tester l’existence d’une relation significative entre deux variables dans deux ou plusieurs groupes. En particulier, elle est mobilisée quand nous souhaitons savoir si une variable explicative (dans notre cas le domaine) influence une variable dépendante (dans notre cas le volume de bois des arbres). Il est important de noter que dans le cas de l’ANOVA la variable explicative est une variable catégorielle, à savoir une variable qui contient des valeurs une qualité ou une caractéristique qui n’est pas quantifiable. D’autre part, la variable cible est une variable quantitative, à savoir une variable qui peut se traduire par des valeurs numériques. 
+
+L’ANOVA suit la même logique d’un test de comparaisons entre moyennes tel que le T-test mais, contrairement au T-test, elle n’est pas bornée à l’analyse de deux groupes : au contraire elle peut prendre en considération une multiplicité de groupes. 
+
+L’objectif de l’ANOVA est de rejeter l’hypothèse nulle qui consiste à dire qu’il n’existe pas une différence significative entre les groupes qu’on examine et de conserver l’hypothèse alternative consistant à affirmer que les différences détectées entre les groupes sont bien réelles. Pour ce faire, comme son nom l’indique, l’ANOVA met en relation la variance interclasse avec la variance intraclasse. La variance interclasse indique la variance qui existe entre les groupes, à savoir, pour revenir à nos données, la variance du volume de bois entre les différents domaine. La variance intraclasse indique la variance au sein de chaque domaine.
+
+```{r anova-site, echo=TRUE}
+library(rstatix)
+data$Domaine <- as.factor(data$Domaine)
+knitr::kable(anova_test(data, Vt_bois~Domaine))
+# anova_test(data, Vt_bois~Age)
+# anova_test(data[data$Domaine != "BaCaSi",], Vt_bois~Domaine)
+# anova_test(data[data$Domaine != "Ibina",], Vt_bois~Domaine)
+```
+
+Dans le tableau ci-dessus, la colonne ges correspond l’eta-carré généralisé 
+(taille de l'effet). Il mesure la proportion de la variabilité de 
+la variable-réponse (ici Vt_bois pour volume total de bois des arbres) qui peut 
+être expliquée par le prédicteur (ici "Domaine" pour le domaine dans lequel 
+l'arbre a été prélevé). Une valeur de l’effet de 0,193 (19,3 %) 
+signifie que 19,3 % de la variation du Volume (Vt_bois) peut être attribuable 
+au site de plantation.
+Le tableau ANOVA ci-dessus montre qu’il existe des différences significatives
+entre les domaines (p = 0,004), qui sont mis en évidence par “*“.
+
+```{r tests-post-hoc, echo=TRUE}
+# Tests post-hoc de Tukey pour effectuer de multiples 
+# comparaisons par paires entre les groupes
+knitr::kable(tukey_hsd(data, Vt_bois~Domaine))
+```
+
+Le résultat contient les colonnes suivantes:
+
+estimate: estimation de la différence entre les moyennes des deux groupes
+conf.low, conf.high : les bornes inférieure et supérieure de l’intervalle de confiance à 95 % (par défaut)
+p.adj: p-value après ajustement pour les comparaisons multiples.
+Il ressort du résultat que seule les différences entre Ibina et Oka2 et Ibina et
+BaCaSi sont significatives (p-value ajustée < 0,05). Ce qui s'explique par l'âge
+des arbres sur Ibina qui est nettement supérieur à celui des autres domaines. 
+
+```{r tests-Campagne, echo=TRUE}
+data$Campagne  <- as.factor(data$Campagne)
+knitr::kable(anova_test(data, Vt_bois~Campagne))
+knitr::kable(tukey_hsd(data, Vt_bois~Campagne))
+# Sans hypothèse d'égalité des variances 
+# pairwise_t_test(data, Vt_bois~Campagne)
+# welch_anova_test(data, Vt_bois~Domaine)
+# Mêmes résultats
+```
+Il ressort du résultat que seule la différence entre Ibina et BaCaSi est 
+significatives (p-value ajustée < 0,05). Ce qui s'explique par l'âge
+des arbres sur Ibina qui est nettement supérieur à ceux de BaCaSi et 
+éventuellement des conditions édaphiques qui différeraient entre les domaines. 
+
+# Tarifs de cubage 
+
+## Calcul du volume réel (sur écorce) de chaque arbre abattu
+
+Le volume de chaque billon (v) est calculé à l’aide de la formule de Smalian [@Louppe_1994].
+Pour chaque arbre, la somme des volumes des billons donne le volume (V) de
+bois « sorti » ou « utile » :
+
+![Formule de Smalian](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/smalian.png){width=250px}
+
+
+
+```{r calc_V}
+ggplot(data=dendro, aes(x=DHP_cm, y=`Vt_bois_m³`))+
+  geom_point()+
+  stat_smooth(method="lm", col='blue')+
+  ggtitle(label=("Volume de bois observé en fonction des DHPs")) +
+  labs(x = "DHP (cm)",
+       y = "Volume (m^3)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+
+```
+
+
+## Matrice de design 
+
+On calcule les variables $D^2\times H_t$, $D^2 \times H_f$, $D^2 \times H_c$ et $D^2 \frac{H_c + C_{dia}}{2}$en mètres. 
+
+```{r X_modV}
+data$D2.Ht_m <- (data$DHP/100)^2*data$H_t
+data$D2.Hc_m <- (data$DHP/100)^2*data$H_c
+data$D2.Hf_m <- (data$DHP/100)^2*data$H_f
+data$D2.meanHcCdia_m <- (data$DHP/100)^2*(data$H_c + data$C_dia)/2
+data$meanHcCdia_m <- (data$H_c + data$C_dia)/2
+data$I_c <- as.factor(data$I_c)
+#knitr::kable(head(data))
+colnames(data)
+```
+
+### Corrélations entre les variables 
+
+```{r corr}
+knitr::opts_chunk$set(echo = FALSE,
+                      include=TRUE,
+                      fig.align="center",
+                      fig.width = 9,
+                      fig.height = 9,
+                      out.width = '100%',
+                      highlight = TRUE)
+pairs(Vt_bois~ DHP + H_t + H_f + H_c + C_dia + S_c + V_c, data[, -c(1:3,9,16)])
+pairs(Vt_bois~ Age + N_tiges + D2.Ht_m + D2.Hf_m + D2.Hc_m,
+      data[, -c(1:3,9,16)])
+```
+
+## Ajustement des tarifs de cubage envisagés 
+
+### Définition des modèles envisagés 
+
+![Tarifs de cubage envisagés](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/tab_mod.png){height=1000px}
+
+Avec : V : volume de l'arbre (m^3),  
+D : DHP (cm) ou somme quadratique des diamètres des tiges mesurées,  
+H_t : hauteur totale de l'arbre (m),  
+H_f : hauteur du fût de l’arbre (m),  
+H_c : profondeur de la couronne de l’arbre (m),   
+C_dia : diamètre de la couronne de l’arbre (m),    
+$D^2\times H_t$, $D^2\times H_f$, $D^2\times H_c$, $D^2\times \frac{H_c + C_{dia}}{2}$ (m),     
+I_c : classe de la couronne (I_c=D, C, I ou S), indiquant la position de l’arbre dans la canopée,  
+N_tiges : nombre de tiges pour lesquelles le diamètre a été mesuré,  
+N_arbres : nombre d’arbres vivants présents dans un rayon de 4m autour de celui considéré,   
+A : âge de la plantation (mois),    
+CF : facteur de correction du biais [@Baskerville_1972].    
+
+### Ajustement des modèles polynomiaux 
+
+```{r setup2, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      include=FALSE,
+                      fig.align="center",
+                      fig.width = 6,
+                      fig.height = 6,
+                      out.width = '70%',
+                      highlight = TRUE)
+```
+
+```{r fit-mod_poly}
+library(nlme)
+library(ggplot2)
+library(dplyr)
+library(ggpubr)
+
+ggplotRegression <- function(mod, num){
+  require(ggplot2)
+  #require(gridExtra)
+  g <- ggplot(mod$model, aes(x=mod$fitted.values, y=mod$model[,1]))+
+    geom_point()+
+    stat_smooth(method="lm", col='blue')+
+    ggtitle(label=paste("Modèle ", num, "Volume de bois vs",
+                        toString(names(mod$model)[-1])),
+            subtitle=paste("R2=", signif(summary(mod)$r.squared),
+                           ", RMSE=", signif(sqrt(mean(mod$residuals^2))),
+                           ", AIC=", signif(AIC(mod)),
+                           ", BIC=", signif(BIC(mod))))+
+    labs(x = "Volume de bois estimé",
+         y = "Volume de bois observé (Vt_bois)")+
+    theme(plot.subtitle = element_text(size=9.5, face="bold"),
+          plot.title = element_text(size=10.5, face="bold"))
+  par(mfrow=c(1,2))
+  plot(mod,1)
+  plot(mod,2)
+  par(mfrow=c(1,1))
+  g
+}
+
+##Ajuster les modèles et visualiser les résultats
+
+mod_1 <- lm(Vt_bois ~ DHP, data = data)
+s_1 <- summary(mod_1)
+s_1
+# Deux manières équivalentes de calculer le RMSE d'un modèle linéaire :
+# RMSE_1 <-  sqrt(mean((mod_1$model$Vt_bois - mod_1$fitted.values)^2))
+# On garde la plus simple :
+RMSE_1 <- sqrt(mean(mod_1$residuals^2))
+Rsquared_1 <- s_1$r.squared
+AIC_1 <- AIC(mod_1)
+BIC_1 <- BIC(mod_1)
+ggplot(data, aes(x = DHP, y = Vt_bois)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle linéaire : Volume Total (Vt_bois) vs DHP",
+       x = "DHP (cm)", y = "Volume Total (Vt_bois)")
+ggplotRegression(mod_1, 1)
+```
+
+
+```{r fit-mod_poly2}
+# Modèle polynomiale (degré 2)
+mod_2 <- lm(Vt_bois ~ poly(DHP, 2), data = data)
+s_2 <- summary(mod_2)
+s_2
+RMSE_2 <- sqrt(mean(mod_2$residuals^2))
+Rsquared_2 <- s_2$r.squared
+AIC_2 <- AIC(mod_2)
+BIC_2 <- BIC(mod_2)
+ggplot(data, aes(x = DHP, y = Vt_bois)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle Polynomiale de degré 2 : Volume Total (Vt_bois) vs DHP",
+       x = "DHP (cm)", y = "Volume Total (Vt_bois)")
+ggplotRegression(mod_2, 2)
+```
+
+
+```{r fit-mod_3}
+# Modèle polynomiale (degré 3)
+mod_3 <- lm(Vt_bois ~ poly(DHP, 3), data = data)
+s_3 <- summary(mod_3)
+s_3
+Rsquared_3 <- s_3$r.squared
+AIC_3 <- AIC(mod_3)
+BIC_3 <- BIC(mod_3)
+RMSE_3 <- sqrt(mean(mod_3$residuals^2))
+ggplot(data, aes(x = DHP, y = Vt_bois)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 3), se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle Polynomiale de degré 3 : Volume Total (Vt_bois) vs DHP",
+       x = "DHP (cm)", y = "Volume Total (Vt_bois)")
+ggplotRegression(mod_3, 3)
+```
+
+
+```{r fit-mod_4, echo=TRUE, include=TRUE}
+# Modèle polynomiale 4
+mod_4 <- lm(Vt_bois ~ I(DHP^2) + I(DHP^3) + D2.Hf_m + D2.Hc_m, data = data)
+s_4 <- summary(mod_4)
+Rsquared_4 <- s_4$r.squared
+AIC_4 <- AIC(mod_4)
+BIC_4 <- BIC(mod_4)
+RMSE_4 <- sqrt(mean(mod_4$residuals^2))
+ggplotRegression(mod_4, 4)
+```
+
+
+```{r fit-mod_5}
+
+# Modèle polynomiale 5
+mod_5 <- lm(Vt_bois ~ I(DHP^2) + I(DHP^3) + D2.Ht_m, data = data)
+s_5 <- summary(mod_5)
+Rsquared_5 <- s_5$r.squared
+AIC_5 <- AIC(mod_5)
+BIC_5 <- BIC(mod_5)
+RMSE_5 <- sqrt(mean(mod_5$residuals^2))
+ggplotRegression(mod_5, 5)
+```
+
+
+
+
+```{r fit-mod_6}
+# Modèle polynomiale 6
+mod_6 <- lm(Vt_bois ~ I(DHP^2) + I(DHP^3) + D2.Ht_m + N_tiges, data = data)
+s_6 <- summary(mod_6)
+Rsquared_6 <- s_6$r.squared
+AIC_6 <- AIC(mod_6)
+BIC_6 <- BIC(mod_6)
+RMSE_6 <- sqrt(mean(mod_6$residuals^2))
+ggplotRegression(mod_6, 6)
+```
+
+
+
+```{r fit-mod_7}
+
+# Modèle polynomiale 7
+mod_7 <- lm(Vt_bois ~ I(DHP^2) + I(DHP^3) + D2.Ht_m + N_tiges + Age, data = data)
+s_7 <- summary(mod_7)
+Rsquared_7 <- s_7$r.squared
+AIC_7 <- AIC(mod_7)
+BIC_7 <- BIC(mod_7)
+RMSE_7 <- sqrt(mean(mod_7$residuals^2))
+ggplotRegression(mod_7, 7)
+```
+
+```{r fit-mod_8}
+
+# Modèle polynomiale 8
+mod_8 <- lm(Vt_bois ~ I(DHP^2) + I(DHP^3) + D2.Ht_m + N_tiges + Age + N_arbres, data = data)
+s_8 <- summary(mod_8)
+Rsquared_8 <- s_8$r.squared
+AIC_8 <- AIC(mod_8)
+BIC_8 <- BIC(mod_8)
+RMSE_8 <- sqrt(mean(mod_8$residuals^2))
+ggplotRegression(mod_8, 8)
+```
+
+```{r fit-mod_9}
+
+# Modèle polynomiale 9
+mod_9 <- lm(Vt_bois ~ I(DHP^2) + I(DHP^3) + D2.Ht_m + N_tiges + Age + N_arbres + I_c,
+            data = data)
+s_9 <- summary(mod_9)
+Rsquared_9 <- s_9$r.squared
+AIC_9 <- AIC(mod_9)
+BIC_9 <- BIC(mod_9)
+RMSE_9 <- sqrt(mean(mod_9$residuals^2))
+# same result as 
+#RMSE_9 <- sqrt(mean((mod_9$fitted.values-mod_9$model$Vt_bois)^2))
+ggplotRegression(mod_9, 9)
+```
+
+
+### Ajustement des modèles en loi de puissance
+
+```{r fit-mod_10}
+ggplotLogRegression <- function(mod, V_hat, num){
+  require(ggplot2)
+  g <- ggplot(mod$model, aes(x=V_hat, y=data$Vt_bois))+
+    geom_point()+
+    stat_smooth(method="lm", col='blue')+
+    ggtitle(label=paste("Modèle ", num,
+                        "Volume de bois vs",
+                        toString(gsub("log", "", names(mod$model)[-1]))),
+            subtitle=paste("R2=", signif(summary(mod)$r.squared),
+                           ", RMSE=", 
+                           signif(sqrt(mean((V_hat-data$Vt_bois)^2))),
+                           ", AIC=", signif(AIC(mod)),
+                           ", BIC=", signif(BIC(mod)))) +
+    labs(x = "Volume de bois estimé",
+         y = "Volume de bois observé (Vt_bois)")+
+    theme(plot.subtitle = element_text(size=9.5, face="bold"),
+          plot.title = element_text(size=10.5, face="bold"))
+  par(mfrow=c(1,2))
+  plot(mod,which=1)
+  plot(mod,which=2)
+  par(mfrow=c(1,1))
+  g
+}
+
+mod_10 <- lm(log(Vt_bois) ~ log(I(DHP^2)), data = data)
+s_10 <- summary(mod_10)
+Rsquared_10 <- s_10$r.squared
+AIC_10 <- AIC(mod_10)
+BIC_10 <- BIC(mod_10)
+CF_10 <- exp(mean((mod_10$fitted.values - mod_10$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(mod_10$coefficients[1])*(data$DHP^2)^mod_10$coefficients[2]*CF_10
+RMSE_10 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplot(data, aes(x = log(DHP^2), y = log(Vt_bois))) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle de Puissance 10: Volume Total (Vt_bois) vs DHP",
+       x = "log(DHP^2) (cm))", y = "log(Vt_bois)")
+ggplotLogRegression(mod_10, V_hat, 10)
+```
+
+```{r fit-mod_11, echo=TRUE, include=TRUE}
+mod_11 <- lm(log(Vt_bois) ~ log(D2.Ht_m), data = data)
+s_11 <- summary(mod_11)
+Rsquared_11 <- s_11$r.squared
+AIC_11 <- AIC(mod_11)
+BIC_11 <- BIC(mod_11)
+CF_11 <- exp(mean((mod_11$fitted.values - mod_11$model$`log(Vt_bois)`)^2)/2)
+V_hat_11 <- exp(mod_11$coefficients[1])*(data$D2.Ht_m)^mod_11$coefficients[2]*CF_11
+RMSE_11 <- sqrt(mean((V_hat_11 - data$Vt_bois)^2))
+
+ggplot(data, aes(x = log(D2.Ht_m), y = log(Vt_bois))) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle de Puissance 11: Volume Total (Vt_bois) vs D^2.H_t",
+       x = "log(DHP^2.H_t) (cm))", y = "log(Vt_bois)")
+ggplotLogRegression(mod_11, V_hat_11, 11)
+```
+
+
+```{r fit-mod_12}
+mod_12 <- lm(log(Vt_bois) ~ log(D2.Ht_m) + N_tiges , data = data)
+s_12 <- summary(mod_12)
+Rsquared_12 <- s_12$r.squared
+AIC_12 <- AIC(mod_12)
+BIC_12 <- BIC(mod_12)
+CF_12 <- exp(mean((mod_12$fitted.values - mod_12$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(mod_12$coefficients[1] + mod_12$coefficients[3]*data$N_tiges)*
+  (data$D2.Ht_m)^mod_12$coefficients[2]*CF_12
+RMSE_12 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_12, V_hat, 12)
+```
+
+```{r fit-mod_13}
+mod_13 <- lm(log(Vt_bois) ~ log(D2.Ht_m) + N_tiges + Age, data = data)
+s_13 <- summary(mod_13)
+Rsquared_13 <- s_13$r.squared
+AIC_13 <- AIC(mod_13)
+BIC_13 <- BIC(mod_13)
+CF_13 <- exp(mean((mod_13$fitted.values - mod_13$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(mod_13$coefficients[1] + mod_13$coefficients[3]*data$N_tiges + mod_13$coefficients[4]*data$Age)*(data$D2.Ht_m)^mod_13$coefficients[2]*CF_13
+RMSE_13 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_13, V_hat, 13)
+```
+
+```{r fit-mod_14, echo=TRUE, include=TRUE}
+mod_14 <- lm(log(Vt_bois) ~ log(D2.Ht_m) + N_tiges + Age + N_arbres + I_c,
+             data = data)
+s_14 <- summary(mod_14)
+Rsquared_14 <- s_14$r.squared
+AIC_14 <- AIC(mod_14)
+BIC_14 <- BIC(mod_14)
+CF_14 <- exp(mean((mod_14$fitted.values - mod_14$model$`log(Vt_bois)`)^2)/2)
+V_hat_14 <- exp(model.matrix(mod_14)[,-2] %*% mod_14$coefficients[-2])*
+  (data$D2.Ht_m)^mod_14$coefficients[2]*CF_14
+RMSE_14 <- sqrt(mean((V_hat_14 - data$Vt_bois)^2))
+ggplotLogRegression(mod_14, V_hat_14, 14)
+```
+
+
+```{r fit-mod_15}
+mod_15 <- lm(log(Vt_bois) ~ log(D2.Hf_m) + log(D2.Hc_m), data = data)
+s_15 <- summary(mod_15)
+Rsquared_15 <- s_15$r.squared
+AIC_15 <- AIC(mod_15)
+BIC_15 <- BIC(mod_15)
+CF_15 <- exp(mean((mod_15$fitted.values - mod_15$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(mod_15$coefficients[1])*
+  (data$D2.Hc_m)^mod_15$coefficients[3]*
+  (data$D2.Hf_m)^mod_15$coefficients[2]*CF_15
+RMSE_15 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_15, V_hat, 15)
+```
+
+
+```{r fit-mod_16}
+mod_16 <- lm(log(Vt_bois) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m), data = data)
+s_16 <- summary(mod_16)
+Rsquared_16 <- s_16$r.squared
+AIC_16 <- AIC(mod_16)
+BIC_16 <- BIC(mod_16)
+CF_16 <- exp(mean((mod_16$fitted.values - mod_16$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(mod_16$coefficients[1])*
+  (data$D2.Hf_m)^mod_16$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_16$coefficients[3]*CF_16
+RMSE_16 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_16, V_hat, 16)
+```
+
+```{r fit-mod_17}
+mod_17 <- lm(log(Vt_bois) ~ log(D2.Hf_m) + log(D2.Hc_m) + N_tiges, data = data)
+s_17 <- summary(mod_17)
+Rsquared_17 <- s_17$r.squared
+AIC_17 <- AIC(mod_17)
+BIC_17 <- BIC(mod_17)
+CF_17 <- exp(mean((mod_17$fitted.values - mod_17$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(model.matrix(mod_17)[,-c(2,3)] %*% mod_17$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_17$coefficients[2]*
+  (data$D2.Hc_m)^mod_17$coefficients[3]*CF_17
+RMSE_17 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_17, V_hat, 17)
+```
+
+```{r fit-mod_18}
+mod_18 <- lm(log(Vt_bois) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + N_tiges
+             , data = data)
+s_18 <- summary(mod_18)
+Rsquared_18 <- s_18$r.squared
+AIC_18 <- AIC(mod_18)
+BIC_18 <- BIC(mod_18)
+CF_18 <- exp(mean((mod_18$fitted.values - mod_18$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(model.matrix(mod_18)[,-c(2,3)] %*% mod_18$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_18$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_18$coefficients[3]*CF_18
+RMSE_18 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_18, V_hat, 18)
+```
+
+```{r fit-mod_19}
+mod_19 <- lm(log(Vt_bois) ~ log(D2.Hf_m) + log(D2.Hc_m) + N_tiges + Age,
+             data = data)
+s_19 <- summary(mod_19)
+Rsquared_19 <- s_19$r.squared
+AIC_19 <- AIC(mod_19)
+BIC_19 <- BIC(mod_19)
+CF_19 <- exp(mean((mod_19$fitted.values - mod_19$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(model.matrix(mod_19)[,-c(2,3)] %*% mod_19$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_19$coefficients[2]*
+  (data$D2.Hc_m)^mod_19$coefficients[3]*CF_19
+RMSE_19 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_19, V_hat, 19)
+```
+
+```{r fit-mod_20}
+mod_20 <- lm(log(Vt_bois) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + N_tiges + Age,
+             data = data)
+s_20 <- summary(mod_20)
+Rsquared_20 <- s_20$r.squared
+AIC_20 <- AIC(mod_20)
+BIC_20 <- BIC(mod_20)
+CF_20 <- exp(mean((mod_20$fitted.values - mod_20$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(model.matrix(mod_20)[,-c(2,3)] %*% mod_20$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_20$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_20$coefficients[3]*CF_20
+RMSE_20 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_20, V_hat, 20)
+```
+
+```{r fit-mod_21}
+mod_21 <- lm(log(Vt_bois) ~ log(D2.Hf_m) + log(D2.Hc_m) + N_tiges + Age 
+             + N_arbres + I_c, data = data)
+s_21 <- summary(mod_21)
+Rsquared_21 <- s_21$r.squared
+AIC_21 <- AIC(mod_21)
+BIC_21 <- BIC(mod_21)
+CF_21 <- exp(mean((mod_21$fitted.values - mod_21$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(model.matrix(mod_21)[,-c(2,3)] %*% mod_21$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_21$coefficients[2]*
+  (data$D2.Hc_m)^mod_21$coefficients[3]*CF_21
+RMSE_21 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_21, V_hat, 21)
+```
+
+```{r fit-mod_22}
+mod_22 <- lm(log(Vt_bois) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + N_tiges + Age 
+             + N_arbres + I_c, data = data)
+s_22 <- summary(mod_22)
+Rsquared_22 <- s_22$r.squared
+AIC_22 <- AIC(mod_22)
+BIC_22 <- BIC(mod_22)
+CF_22 <- exp(mean((mod_22$fitted.values - mod_22$model$`log(Vt_bois)`)^2)/2)
+V_hat <- exp(model.matrix(mod_22)[,-c(2,3)] %*% mod_22$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_22$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_22$coefficients[3]*CF_22
+RMSE_22 <- sqrt(mean((V_hat - data$Vt_bois)^2))
+ggplotLogRegression(mod_22, V_hat, 22)
+```
+
+### Ajustement de modèles intégrant un effet site 
+
+```{r setup3}
+knitr::opts_chunk$set(echo = TRUE,
+                      include=TRUE,
+                      fig.align="center",
+                      fig.width = 6,
+                      fig.height = 6,
+                      out.width = '70%',
+                      highlight = TRUE)
+```
+
+```{r fit-mod_4_site}
+
+# Modèle polynomiale 4 avec effet domaine fixe
+mod_4_site <- lm(Vt_bois ~ I(DHP^2) + I(DHP^3) + D2.Hf_m + D2.Hc_m + Domaine,
+                 data = data)
+s_4_site <- summary(mod_4_site)
+Rsquared_4_site <- s_4_site$r.squared
+AIC_4_site <- AIC(mod_4_site)
+BIC_4_site <- BIC(mod_4_site)
+RMSE_4_site <- sqrt(mean(mod_4_site$residuals^2))
+ggplotRegression(mod_4_site, 4)
+s_4_site
+
+library(r2glmm)
+library(lme4)
+ggplotRandRegression <- function(mod, V_hat, num){
+  require(ggplot2)
+  g <- ggplot(mod@frame, aes(x=V_hat, y=data$Vt_bois))+
+    geom_point()+
+    stat_smooth(method="lm", col='blue')+
+    ggtitle(label=paste("Modèle", num, "avec effet site aléatoire",
+                        "Volume de bois vs",
+                        toString(gsub("log", "", names(mod@frame)[-1]))),
+            subtitle=paste("R2=",
+                           signif(performance::r2_nakagawa(mod)$R2_conditional),
+                           ", RMSE=",
+                           signif(sqrt(mean((V_hat-data$Vt_bois)^2))),
+                           ", AIC=", signif(AIC(mod)),
+                           ", BIC=", signif(BIC(mod)))) +
+    labs(x = "Volume de bois estimé",
+         y = "Volume de bois observé (Vt_bois)")+
+    theme(plot.subtitle = element_text(size=9.5, face="bold"),
+          plot.title = element_text(size=10.5, face="bold"))
+  plot(mod)
+  g
+}
+# Modèle polynomiale 4 avec effet domaine aléatoire 
+mod_4_site_rand <- lme4::lmer(Vt_bois ~ I(DHP^2) + I(DHP^3) + D2.Hf_m + D2.Hc_m + 
+                                (1|Domaine), data = data)
+s_4_site_rand <- summary(mod_4_site_rand)
+Rsquared_4_site_rand <- signif(r2glmm::r2beta(mod_4_site_rand, method="nsj",
+                                              partial=FALSE)[1,"Rsq"])
+AIC_4_site_rand <- AIC(mod_4_site_rand)
+BIC_4_site_rand <- BIC(mod_4_site_rand)
+RMSE_4_site_rand <- sqrt(mean(residuals(mod_4_site_rand)^2))
+ggplotRandRegression(mod_4_site_rand, fitted(mod_4_site_rand), 4)
+s_4_site_rand
+confint(mod_4_site_rand)
+```
+
+
+```{r fit-mod_11_site}
+# Modèle en loi de puissance 11 avec effet domaine fixe
+mod_11_site <- lm(log(Vt_bois) ~ log(D2.Ht_m) + Domaine, data = data)
+s_11_site <- summary(mod_11_site)
+Rsquared_11_site <- s_11_site$r.squared
+AIC_11_site <- AIC(mod_11_site)
+BIC_11_site <- BIC(mod_11_site)
+CF_11_site <- exp(mean((mod_11_site$fitted.values -
+                          mod_11_site$model$`log(Vt_bois)`)^2)/2)
+V_hat_11_site <- exp(model.matrix(mod_11_site)[,-2] %*% 
+                       mod_11_site$coefficients[-2])*
+  (data$D2.Ht_m)^mod_11_site$coefficients[2]*CF_11_site
+RMSE_11_site <- sqrt(mean((V_hat_11_site - data$Vt_bois)^2))
+
+ggplot(data, aes(x = log(D2.Ht_m), y = log(Vt_bois))) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle de Puissance 11: Volume Total (Vt_bois) vs D^2.H_t,
+       Domaine",
+       x = "log(DHP) (cm))", y = "log(Vt_bois)")
+ggplotLogRegression(mod_11_site, V_hat_11_site, 11)
+s_11_site
+
+# Modèle en loi de puissance 11 avec effet domaine aléatoire 
+mod_11_site_rand <- lme4::lmer(log(Vt_bois) ~ log(D2.Ht_m) + 
+                                 (1|Domaine), data = data)
+s_11_site_rand <- summary(mod_11_site_rand)
+Rsquared_11_site_rand <- signif(r2glmm::r2beta(mod_11_site_rand,
+                                               method="nsj",
+                                               partial=FALSE)[1,"Rsq"])
+AIC_11_site_rand <- AIC(mod_11_site_rand)
+BIC_11_site_rand <- BIC(mod_11_site_rand)
+CF_11_site_rand <- exp(mean((fitted(mod_11_site_rand) -
+                               mod_11_site_rand@frame$`log(Vt_bois)`)^2)/2)
+design.matrix <- model.matrix(mod_11_site)
+colnames(design.matrix)[1] <- "DomaineBaCaSi"
+design.matrix <- design.matrix[, -2]
+design.matrix[,"DomaineBaCaSi"] <- 1-design.matrix[,2]-design.matrix[,3]
+V_hat_11_site_rand <- exp(design.matrix %*% 
+                            coef(mod_11_site_rand)$Domaine[,-2])*
+  (data$D2.Ht_m)^coef(mod_11_site_rand)$Domaine[2,2]*CF_11_site_rand
+RMSE_11_site_rand <- sqrt(mean((V_hat_11_site_rand - data$Vt_bois)^2))
+
+ggplot(data, aes(x = log(D2.Ht_m), y = log(Vt_bois))) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle de Puissance 11: Volume Total (Vt_bois) vs D^2.H_t,
+       Domaine",
+       x = "log(D^2.H_t) (cm))", y = "log(Vt_bois)")
+ggplotRandRegression(mod_11_site_rand, V_hat_11_site_rand, 11)
+s_11_site_rand
+confint(mod_11_site_rand)
+```
+
+```{r fit-mod_14_site}
+# Modèle en loi de puissance 14 avec effet domaine fixe
+mod_14_site <- lm(log(Vt_bois) ~ log(D2.Ht_m) + N_tiges + Age 
+                  + N_arbres + I_c + Domaine,
+                  data = data)
+s_14_site <- summary(mod_14_site)
+Rsquared_14_site <- s_14_site$r.squared
+AIC_14_site <- AIC(mod_14_site)
+BIC_14_site <- BIC(mod_14_site)
+CF_14_site <- exp(mean((mod_14_site$fitted.values - 
+                          mod_14_site$model$`log(Vt_bois)`)^2)/2)
+V_hat_14_site <- exp(model.matrix(mod_14_site)[,-2] %*% 
+                       mod_14_site$coefficients[-2])*
+  (data$D2.Ht_m)^mod_14_site$coefficients[2]*CF_14_site
+RMSE_14_site <- sqrt(mean((V_hat_14_site - data$Vt_bois)^2))
+ggplotLogRegression(mod_14_site, V_hat_14_site, 14)
+s_14_site
+
+# Modèle en loi de puissance 14 avec effet domaine aléatoire 
+mod_14_site_rand <- lme4::lmer(log(Vt_bois) ~ log(D2.Ht_m) + N_tiges + Age 
+                               + N_arbres + I_c + (1|Domaine),
+                               data = data)
+s_14_site_rand <- summary(mod_14_site_rand)
+Rsquared_14_site_rand <- signif(r2glmm::r2beta(mod_14_site_rand,
+                                        method="nsj", partial=FALSE)[1,"Rsq"])
+AIC_14_site_rand <- AIC(mod_14_site_rand)
+BIC_14_site_rand <- BIC(mod_14_site_rand)
+CF_14_site_rand <- exp(mean((fitted(mod_14_site_rand) - 
+                               mod_14_site_rand@frame$`log(Vt_bois)`)^2)/2)
+design.matrix <- model.matrix(mod_14_site)
+colnames(design.matrix)[1] <- "DomaineBaCaSi"
+design.matrix <- design.matrix[, -c(2:8)]
+design.matrix[,"DomaineBaCaSi"] <- 1-design.matrix[,2]-design.matrix[,3]
+V_hat_14_site_rand <- exp(design.matrix %*% 
+                            coef(mod_14_site_rand)$Domaine[,1] + 
+                            model.matrix(mod_14_site)[,-c(1,2,9,10)] %*%
+                            t(coef(mod_14_site_rand)$Domaine[1,-c(1,2)]))*
+  (data$D2.Ht_m)^coef(mod_14_site_rand)$Domaine[2,2]*CF_14_site_rand
+RMSE_14_site_rand <- sqrt(mean((V_hat_14_site_rand - data$Vt_bois)^2))
+ggplotRandRegression(mod_14_site_rand, V_hat_14_site_rand, 14)
+s_14_site_rand
+confint(mod_14_site_rand)
+```
+
+
+Les modèles intégrant un effet domaine fixe ou aléatoire, ne semblent pas plus pertinents que ceux ne prenant pas en 
+compte cette variable. 
+De plus on peut voir que les paramètres associés aux domaines ne sont pas significatifs dans la majorité des cas. 
+
+### Analyse de résidus 
+
+La validation des hypothèses sur les résidus ($\epsilon_i~ mathcal{N}(0,\sigma^2$) et la qualité de l'ajustement observation par observation constitue une étape primordiale de la régression linéaire. Cette étape est essentiellement fondée sur des méthodes graphiques fournies la fonction `plot.lm()`, et il est donc difficile d'avoir des règles strictes de décision.   
+
+- Analyse de la normalité : L'hypothèse de normalité sera examinée à l'aide d'un graphique comparant les quantiles des résidus estimés aux quantiles sous l'hypothèse de normalité, ce qui correspond aux graphiques intitulés "Normal Q-Q" présentés ci-dessus pour chaque modèle.  Ce type de graphique est appelé droite de Henry. Si les résidus ne sont pas normalement distribués, ils vont s'écarter de la droite, ce qui n'est pas le cas pour nos modèles. 
+
+- Analyse de l'homoscédasticité (variance identique pour tous les résidus)
+Il n'existe pas de procédure précise pour vérifier l'hypothèse d'homoscédasticité. Nous proposons plusieurs graphiques possibles pour détecter une hétéroscédasticité. Il est recommandé de tracer les résidus en
+fonction des valeurs ajustées $\hat{y_i}$, ce qui correspond aux graphiques intitulés "Residuals vs Fitted" présentés ci-dessus pour chaque modèle. 
+Si une structure apparaît (tendance, cône, vagues), l'hypothèse d'homoscédasticité risque fort de ne pas être vérifiée, ce qui n'est pas le cas pour nos modèles. 
+
+- Analyse de la structure des résidus
+Les résidus sont supposés être indépendants. L'indépendance est très diffcile à tester de manière formelle. Le test de Durbin-Watson est le plus souvent utilisé, consiste à tester l'hypothèse H0 : l'indépendance, contre H1 : les résidus sont non-indépendants d'un certaine façon. Cependant il existe de nombreux modèles de non-indépendance qui ne seront pas forcément détectés par ce test. On n'a pas réalisé cette vérification. 
+
+## Sélection de modèle 
+
+```{r setup4, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      include=TRUE,
+                      fig.align="center",
+                      fig.width = 8,
+                      fig.height = 8,
+                      out.width = '100%',
+                      highlight = TRUE)
+```
+
+
+### Définition des modèles ajustés
+
+![Tarifs de cubage ajustés](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/tab_mod.png){height=1500px}
+
+Avec : V : volume de l'arbre (m^3),  
+D : DHP (cm) ou somme quadratique des diamètres des tiges mesurées,  
+H_t : hauteur totale de l'arbre (m),  
+H_f : hauteur du fût de l’arbre (m),  
+H_c : profondeur de la couronne de l’arbre (m),   
+C_dia : diamètre de la couronne de l’arbre (m), 
+$D^2\times H_t$, $D^2\times H_f$, $D^2\times H_c$, $D^2\times \frac{H_c + C_{dia}}{2}$ (m),   
+I_c : classe de la couronne (I_c=D, C, I ou S), indiquant la position de l’arbre dans la canopée,  
+N_tiges : nombre de tiges pour lesquelles le diamètre a été mesuré,  
+N_arbres : nombre d’arbres vivants présents dans un rayon de 4m autour de celui considéré,   
+A : âge de la plantation (mois),    
+CF : facteur de correction du biais [@Baskerville_1972].    
+
+### Identification des variables significatives et paramètres des modèles
+
+```{r signif-mod, echo=FALSE}
+# Table pour modèles linéaires
+tab_signif_lin <- matrix(" " ,18, 14)
+colnames(tab_signif_lin) <- c("Eq.", "(Intercept)", "D (cm)", "D^2 (cm)", "D^3 (cm)",
+                              "D^2.Ht_m (m)", "D^2.Hf_m (m)", "D^2.Hc_m (m)", 
+                              "N_tiges","Age (mois)", "N_arbres", "I_cD", "I_cI", "I_cS")
+tab_signif_lin <- as.data.frame(tab_signif_lin)
+tab_signif_lin$Eq. <- rep(1:9, each=2)
+tab_signif_lin[1,c(2,3)] <- s_1$coefficients[,"Estimate"]
+tab_signif_lin[2,c(2,3)] <- "***"
+tab_signif_lin[3,c(2,3,4)] <- s_2$coefficients[,"Estimate"]
+tab_signif_lin[4,c(2,3,4)] <- "***"
+tab_signif_lin[5,c(2:5)] <- s_3$coefficients[,"Estimate"]
+tab_signif_lin[6,c(2:5)] <- c(rep("***",3), "*")
+tab_signif_lin[7,c(2,4:5,7:8)] <- s_4$coefficients[,"Estimate"]
+tab_signif_lin[8,c(2,4:5,7:8)] <- c(rep(" ",3), rep("***",2))
+tab_signif_lin[9,c(2,4:6)] <- s_5$coefficients[,"Estimate"]
+tab_signif_lin[10,c(2,4:6)] <- c(rep(" ",3), "***")
+tab_signif_lin[11,c(2,4:6,9)] <- s_6$coefficients[,"Estimate"]
+tab_signif_lin[12,c(2,4:6,9)] <- c(rep(" ",3), "***", " ")
+tab_signif_lin[13,c(2,4:6,9:10)] <- s_7$coefficients[,"Estimate"]
+tab_signif_lin[14,c(2,4:6,9:10)] <- c(rep(" ",3), "***", rep(" ",2))
+tab_signif_lin[15,c(2,4:6,9:11)] <- s_8$coefficients[,"Estimate"]
+tab_signif_lin[16,c(2,4:6,9:11)] <- c(rep(" ",3), "***", rep(" ",2), ".")
+tab_signif_lin[17,c(2,4:6,9:14)] <- s_9$coefficients[,"Estimate"]
+tab_signif_lin[18,c(2,4:6,9:14)] <- c(rep(" ",3), "***", rep(" ",6))
+knitr::kable(tab_signif_lin, align='c')
+write.csv2(tab_signif_lin, "D:/STAGE 2024 FRM/ANALYSES STATISTIQUES/Taff avec Jeanne/13_08_2024/Saisie_Equa_Allom2024_Arbres sur pied_V7.xlsx")
+# Table pour modèles en loi de puissance
+tab_signif_log <- matrix(" " ,26, 14)
+colnames(tab_signif_log) <- c("Eq.", "(Intercept)", "log(D^2)",
+                              "log(D^2.Ht_m)", "log(D^2.Hf_m)",
+                              "log(D^2.Hc_m)", "log(D^2.meanHcCdia_m)",
+                              "N_tiges","Age", "N_arbres",
+                              "I_cD", "I_cI", "I_cS", "CF")
+tab_signif_log <- as.data.frame(tab_signif_log)
+tab_signif_log$Eq. <- rep(10:22, each=2)
+tab_signif_log[1,c(2,3,14)] <- c(s_10$coefficients[,"Estimate"], CF_10)
+tab_signif_log[2,c(2,3)] <- "***"
+tab_signif_log[3,c(2,4,14)] <- c(s_11$coefficients[,"Estimate"], CF_11)
+tab_signif_log[4,c(2,4)] <- "***"
+tab_signif_log[5,c(2,4,8,14)] <- c(s_12$coefficients[,"Estimate"], CF_12)
+tab_signif_log[6,c(2,4,8)] <- c(rep("***",2), "")
+tab_signif_log[7,c(2,4,8,9,14)] <- c(s_13$coefficients[,"Estimate"], CF_13)
+tab_signif_log[8,c(2,4,8,9)] <- c(rep("***",2),rep(" ",2))
+tab_signif_log[9,c(2,4,8:13,14)] <- c(s_14$coefficients[,"Estimate"], CF_14)
+tab_signif_log[10,c(2,4,10)] <- c("***","**", "*")
+tab_signif_log[11,c(2,5,6,14)] <- c(s_15$coefficients[,"Estimate"], CF_15)
+tab_signif_log[12,c(2,5,6)] <- c("**", "***", "***")
+tab_signif_log[13,c(2,5,7,14)] <- c(s_16$coefficients[,"Estimate"], CF_16)
+tab_signif_log[14,c(2,5,7)] <- c("","***", "***")
+tab_signif_log[15,c(2,5,6,8,14)] <- c(s_17$coefficients[,"Estimate"], CF_17)
+tab_signif_log[16,c(2,5,6,8)] <- c("**","***","***", ".")
+tab_signif_log[17,c(2,5,7,8,14)] <- c(s_18$coefficients[,"Estimate"], CF_18)
+tab_signif_log[18,c(5,7)] <- c("***","***")
+tab_signif_log[19,c(2,5,6,8:9,14)] <- c(s_19$coefficients[,"Estimate"], CF_19)
+tab_signif_log[20,c(5,6,8)] <- c("***","***", ".")
+tab_signif_log[21,c(2,5,7,8:9,14)] <- c(s_20$coefficients[,"Estimate"], CF_20)
+tab_signif_log[22,c(5,7)] <- "***"
+tab_signif_log[23,c(2,5,6,8:14)] <- c(s_21$coefficients[,"Estimate"], CF_21)
+tab_signif_log[24,c(5,6)] <- "***"
+tab_signif_log[25,c(2,5,7,8:14)] <- c(s_22$coefficients[,"Estimate"], CF_22)
+tab_signif_log[26,c(5,7)] <- "***"
+knitr::kable(tab_signif_log, align='c')
+write.csv2(tab_signif_log, "D:/STAGE 2024 FRM/ANALYSES STATISTIQUES/Taff avec Jeanne/13_08_2024/Saisie_Equa_Allom2024_Arbres sur pied_V7.xlsx")
+```
+
+![Code de signification](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/signif_code.png){height=200px}
+  
+  
+Les codes de signification dans R sont un moyen de mesurer le niveau de signification d'un résultat d'analyse statistique. Ces codes sont représentés par des astérisques (*) et indiquent le niveau de confiance dans les résultats, un nombre plus élevé d'astérisques représentant un niveau de signification plus élevé.
+
+### Critères de sélection 
+
+On sélectionne les modèles les plus pertinents selon quatre critères :
+
+
+- Le critère d'information d'Akaike: $AIC=2k - 2ln(L)$, où $k$ est le nombre de paramètres à estimer du modèle et $L$ est le maximum de la fonction de vraisemblance du modèle.
+- Le critère d'information bayésien: $BIC=2ln(N) -2ln(L)$, avec $L$ la vraisemblance du modèle estimée, 
+$N$ le nombre d'observations dans l'échantillon et $k$ le nombre de paramètres libres du modèle.
+- La racine de l'erreur quadratique moyenne (root-mean-square error): $RMSE=\sqrt{\frac{1}{N}\sum_{i=1}^N(V_i-\widehat{V_i})^2}$, avec $N$ le nombre d'observations dans l'échantillon, $\widehat{V_i}$ le volume estimé de l'arbre $i$ et $V_i$ son volume observé. 
+- Le coefficient de détermination linéaire de Pearson: $R^2=1-\frac{\sum_{i=1}^N(V_i-\widehat{V_i})^2}{\sum_{i=1}^N(V_i-\overline{V_i})^2}$, , avec $N$ le nombre d'observations dans l'échantillon, $\widehat{V_i}$ le volume estimé de l'arbre $i$, $V_i$ son volume observé et $\overline{V_i}$, la moyenne des volumes observés sur le terrain.   
+- L'écart type des résidus $\hat{\sigma}$, estimé pour une régression linéaire de la forme $y_i=\beta x_i + \epsilon_i$ avec $\epsilon_i \sim \mathcal{N}(0,\sigma^2)$.  
+
+Le modèle qui sera sélectionné est celui qui minimise les critères $AIC$, $BIC$ et $RMSE$ et dont le $R^2$ et le plus proche de 1.
+
+```{r comparaison-mod, echo=FALSE, inlcude=TRUE}
+tab <- data.frame(Eq.=c(1:9,"4 + domaine", "4 + domaine rand",
+                        10:22, "11 + domaine", "11 + domaine rand",
+                        "14 + domaine", "14 + domaine rand"),
+                  RMSE=NA, AIC=NA, BIC=NA, R_squared=NA, Sigma=NA, 
+                  type=c(rep("linéaire", 11), rep("logarithmique", 17)))
+tab$RMSE <- round(c(unlist(mget(paste0("RMSE_", 1:9))),RMSE_4_site, RMSE_4_site_rand,
+              unlist(mget(paste0("RMSE_", 10:22))),
+              RMSE_11_site, RMSE_11_site_rand, RMSE_14_site, RMSE_14_site_rand),5)
+tab$AIC <- round(c(unlist(mget(paste0("AIC_", 1:9))), AIC_4_site, AIC_4_site_rand, 
+             unlist(mget(paste0("AIC_", 10:22))),
+              AIC_11_site, AIC_11_site_rand, AIC_14_site, AIC_14_site_rand),4)
+tab$BIC <- round(c(unlist(mget(paste0("BIC_", 1:9))), BIC_4_site, BIC_4_site_rand,
+             unlist(mget(paste0("BIC_", 10:22))),
+             BIC_11_site, BIC_11_site_rand, BIC_14_site, BIC_14_site_rand),4)
+tab$R_squared <- round(c(unlist(mget(paste0("Rsquared_", 1:9))),
+                   Rsquared_4_site, Rsquared_4_site_rand,
+                   unlist(mget(paste0("Rsquared_", 10:22))),
+                   Rsquared_11_site, Rsquared_11_site_rand,
+                   Rsquared_14_site, Rsquared_14_site_rand),4)
+s_all <- unlist(mget(paste0("s_", 1:22)))
+Sigma <- unlist(s_all[grep("sigma", names(s_all))])
+tab$Sigma <- round(c(Sigma[1:9], s_4_site$sigma, s_4_site_rand$sigma,
+               Sigma[10:22], s_11_site$sigma, s_11_site_rand$sigma,
+                   s_14_site$sigma, s_14_site_rand$sigma), 5)
+knitr::kable(tab)
+
+min_AIC_lin <- tab$Eq.[tab$AIC==min(tab$AIC[tab$type=="linéaire"])]
+min_BIC_lin <- tab$Eq.[tab$BIC==min(tab$BIC[tab$type=="linéaire"])]
+min_AIC_log <- tab$Eq.[tab$AIC==min(tab$AIC[tab$type!="linéaire"])]
+min_BIC_log <- tab$Eq.[tab$BIC==min(tab$BIC[tab$type!="linéaire"])]
+min_RMSE <- tab$Eq.[tab$RMSE==min(tab$RMSE)]
+max_R2 <- tab$Eq.[tab$R_squared==max(tab$R_squared)]
+```
+
+Pour que les valeurs de l’AIC (ou BIC) soient comparables, tous les modèles 
+doivent avoir la même variable réponse. 
+
+On ne peut donc pas comparer des modèles où la réponse est Vt_bois (type=linéaire),
+avec d’autres où la réponse est log(Vt_bois) (type=logarithmique). 
+
+
+On peut en revanche comparer les RMSE entre tous les modèles, car ils ont été 
+calculés à partir des valeurs ajustées, retransformées à l’échelle normale, pour 
+les modèles logarithmiques.   
+
+Le modèle linéaire qui minimise le critère AIC est le `r min_AIC_lin`, celui qui minimise le BIC est le `r min_BIC_lin`.
+
+Le modèle logarithmique qui minimise le critère AIC est le `r min_AIC_log`, celui qui minimise le BIC est le `r min_BIC_log`.
+
+Parmi tous les modèles, celui qui présente le plus faible RMSE est le `r min_RMSE` et celui dont le $R^2$ est le plus proche de 1 est le `r max_R2`. 
+
+La différence étant négligeable (<5) entre les AIC des modèles 14 et 11, et le RMSE du modèle 11 étant plus faible que celui du modèle 14, on peut retenir ce modèle, sans prendre en compte l'effet domaine qui n'est pas significatif.  
+
+Par ailleurs le modèle 11 ne prend en compte que le DBH et la hauteur totale des arbres, tandis que le modèle 14 prend en plus en compte le nombre de tiges de l'arbre, son âge, sa classe de couronne ainsi que le nombre d'arbres dans le voisinage et le modèle 4 considère la profondeur de couronne et la hauteur du fût en plus du DBH. Le modèle le plus parcimonieux parmi les trois retenus est donc le modèle 11.
+
+De plus le modèle 11 rempli les critères du paragraphe 6 de [l'outil méthodologique A/R](https://cdm.unfccc.int/methodologies/ARmethodologies/tools/ar-am-tool-18-v1.0.1.pdf): Démontrer la pertinence des équations de volume pour l'estimation de la biomasse aérienne des arbres dans les activités de projet A/R CDM.
+En effet l'équation a été dérivée d'un ensemble de données d'au moins 30 arbres échantillonnés (n=54), et la valeur du coefficient de détermination (R2) obtenue (0.9809) est supérieure ou égale à 0,85.
+
+### Tarifs de cubage retenus
+
+Finalement, le modèle retenu est détaillé dans le tableau ci-dessous : 
+
+```{r tab-mod, echo=FALSE}
+tab_mod <- data.frame("Eq."=c("4", "11", "14"),
+                      "Type"= c("Linéaire",
+                                 rep("Loi de puissance",
+                                     2)))
+tab_mod$CF=c("", round(CF_11,5), round(CF_14,5))
+tab_mod$a0=c(paste0(round(mod_4$coefficients[1],3),"$^(ns)$"),
+             round(mod_11$coefficients[1],3),
+             round(mod_14$coefficients[1],3))
+
+tab_mod$a1=c(paste0(round(mod_4$coefficients[2],3),"$^(ns)$"),
+             round(mod_11$coefficients[2],3),
+             round(mod_14$coefficients[2],3))
+tab_mod$X1=c("D", "D2.H_t", "D2.H_t")
+tab_mod$a2=c(paste0(round(mod_4$coefficients[3],3),"$^(ns)$"),
+             "",
+             paste0(round(mod_14$coefficients[3],3),"$^(ns)$"))
+tab_mod$X2=c("D2","","N_tiges")
+tab_mod$a3=c(paste0(round(mod_4$coefficients[4],3),"$^(ns)$"),
+             "",
+             paste0(round(mod_14$coefficients[4],3),"$^(ns)$"))
+tab_mod$X3=c("D^3","","Age")
+tab_mod$a4=c(round(mod_4$coefficients[5],3),
+             "",
+             round(mod_14$coefficients[5],3))
+tab_mod$X4=c("D2.H_f", "", "N_arbres")
+tab_mod$a5=c(round(mod_4$coefficients[6],3),
+             "",
+             paste0(round(mod_14$coefficients[6],3),"$^(ns)$"))
+tab_mod$X5=c("D2.H_c", "", "I_cD")
+tab_mod$a6=c("","",
+             paste0(round(mod_14$coefficients[7],3),"$^(ns)$"))
+tab_mod$X6=c("", "", "I_cI")
+
+tab_mod$a7=c("", "", paste0(round(mod_14$coefficients[8],3),
+                            "$^(ns)$"))
+tab_mod$X7=c("", "", "I_cS")
+
+knitr::kable(tab_mod)
+```
+  
+(ns) = non significatif, p-value>0.05    
+
+Modèle de type linéaire de la forme (4) :$V=a_0+a_1.X_1+a_2.X_2+...+a_5.X_5$  
+
+Modèle de type loi de puissance (11 et 14) : $V=exp(a_0 + a_2.X_2+...+a_7.X_7).X_1^{a_1}.CF$  
+
+CF : facteur de correction du biais [@Baskerville_1972].  
+
+Finalement les modèles retenus s'écrivent sous la forme :
+
+- $ Eq.4:  \ \ V=0.009748416 + 0.078680897\times D + 0.029047473 \times D^2 + 0.018036009\times D^3 + 0.564372606\times D^2\times H_f + 0.290039262 \times D^2 \times H_c$
+
+- $ Eq.11: V= CF_{11} \times exp(-0.9163107) \times (D^2 \times H_t)^{0.9838133}=0.4041496 \times (D^2 \times H_t)^{0.9838133}$
+
+-$Eq.14:  \ \  V= CF_{14} \times exp(-0.560473969 -0.034972806 \times N_{tiges}  -0.002709859 \times Age -0.055084204 \times N_{arbres} +  0.065227716\times I_{cD} + 0.037493088\times I_{cI} -0.038760280 \times I_{cS}) \times  (D^2 \times H_t)^{ 0.993589407} =  0.5755101 \times  exp(-0.034972806 \times N_{tiges}  -0.002709859 \times Age -0.055084204 \times N_{arbres} +  0.065227716\times I_{cD} + 0.037493088\times I_{cI} -0.038760280 \times I_{cS}) \times  (D^2 \times H_t)^{ 0.993589407}$
+
+avec
+- $Age$ en mois 
+- $D$ en cm
+- $D^2\times H_t$, $D^2\times H_f$ et $D^2\times H_c$ en m 
+- $V$ en $m^3$
+
+## Comparaison des modèles retenus avec ceux de la littérature 
+
+Le tarif de cubage utilisé, jusqu'à maintenant, par FRM, pour estimer le volume de bois et le stock de carbone représenté par les *A. mangium* des domaines SPF2B (Ibina et Oka2) et BaCaSi, est issu de l'article @Peroches_2014. 
+
+![@Peroches_2014](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/mod_Peroches.png)
+
+
+Cet article présente également un tarif à double entrée pour les *A. mangium* que l'on va confronter aux modèles ajustés précédemment 
+![@Peroches_2014](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/tab_Peroches.png)
+
+On va également confronter nos résultats à ceux obtenus avec l'équation de biomasse issue de l'article @Bernhard_1993 pour estimer le poids de bois :
+
+![@Bernhard_1993](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/tab_mod_Bernhard.png)
+### RMSE 
+
+```{r comp_bib}
+Vhat_Peroches1 <- 0.60983*((data$DHP*pi)^2/10000)^1.338
+RMSE_Peroches1 <- sqrt(mean((Vhat_Peroches1-data$Vt_bois)^2))
+Vhat_Peroches2 <- 0.03349*((data$DHP*pi)^2*data$H_t/10000)^1.141
+RMSE_Peroches2 <- sqrt(mean((Vhat_Peroches2-data$Vt_bois)^2))
+# Pour le calcul du volume de bois selon Bernhard (1993) on a besoin des circonférences à 10cm
+cubage <- read_excel("D:/STAGE 2024 FRM/ANALYSES STATISTIQUES/Taff avec Jeanne/13_08_2024/Saisie_Equa_Allom2024_Arbres sur pied_V7.xlsx",
+                     sheet="cubage", skip=1)
+
+
+cubage <- na.omit(cubage)
+colnames(cubage)[1:2] <- c("n°_arbre","ID_arbre")
+data <- dplyr::left_join(data,cubage[,c("ID_arbre","dhp_10cm")], by="ID_arbre")
+# Biomass expansion factor
+BEFMang_old <- 1.332
+# Densité spécifique du mangium (g/cm^3)
+DMang <- 0.507
+DMang_kgcm3 <- DMang/1000
+DMang_kgm3 <- DMang_kgcm3*1/10^(-6)
+# L'équation de l'article donne le poids de bois, on convertit en volume (m3) cette valeur 
+V_hat_Bernhard <- (19.2 + 3.57*10^(-4)*(data$dhp_10cm*pi)^3)/DMang_kgm3 
+RMSE_Bernhard <- sqrt(mean((V_hat_Bernhard-data$Vt_bois)^2))
+tab_comp <- data.frame(Modèle=c("Equation une entrée (Bernhard)",
+                                "Tarif une entrée (Peroches)",
+                                "Tarif deux entrées (Peroches)",
+                                "Eq. 4", "Eq. 11", "Eq. 14"),
+                       RMSE=round(c(RMSE_Bernhard,
+                                    RMSE_Peroches1, RMSE_Peroches2, 
+                                    RMSE_4, RMSE_11, RMSE_14),4),
+                       'Validité Circ (cm)'=c("24-94", "12-70","12-70",
+                                              rep("14-75", 3)),
+                       'Validité H_t (m) '=c("X", "X", "5.4-11",
+                                             rep("4.7-19.8", 3)),
+                       'Validité N_tiges'=c(rep("X", 5),
+                                            paste0(min(data$N_tiges),"-",
+                                                   max(data$N_tiges))),
+                       'Validité Age (mois)'=c(rep("X", 5),
+                                               paste0(min(data$Age),"-",
+                                                      max(data$Age))))
+
+knitr::kable(tab_comp)
+```
+
+
+### Résultats 
+
+```{r plots_comp}
+knitr::opts_chunk$set(echo = FALSE,
+                      include=TRUE,
+                      fig.align="center",
+                      fig.width = 9,
+                      fig.height = 9,
+                      out.width = '100%',
+                      highlight = TRUE)
+Vhat <- data.frame(V_hat=c(Vhat_Peroches1, Vhat_Peroches2, V_hat_Bernhard,
+                           mod_4$fitted.values, V_hat_11, V_hat_14),
+                   Modèle=rep(c("Tarif une entrée (Peroches)",
+                                "Tarif deux entrées (Peroches)",
+                                "Tarif une entrée (Bernhard)",
+                                 "Eq. 4 (trois entrées)",
+                                 "Eq. 11 (deux entrées)",
+                                 "Eq. 14 (six entrées)"),
+                               each=length(V_hat_11)),
+                   V_obs=rep(data$Vt_bois,6),
+                   Domaine=rep(data$Domaine,6),
+                   Campagne=rep(data$Campagne,6))
+
+ggplot(data=Vhat, aes(x=V_obs, y=V_hat, color=Modèle))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red", linetype="dashed") +
+  stat_smooth(method="lm", fullrange = TRUE, se=FALSE)+
+  ggtitle(label=("Volume de bois estimés selon différents tarifs de cubage
+  en fonction des volumes observés")) +
+  labs(y = "Volume estimé (m^3)",
+       x = "Volume observé (m^3)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+ggplot(data=Vhat, aes(x=V_obs, y=V_hat, color=Modèle, shape=Domaine))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red", linetype="dashed") +
+  ggtitle(label=("Volume de bois estimés selon différents tarifs de cubage
+  en fonction des volumes observés distingués par domaine")) +
+  labs(y = "Volume estimé (m^3)",
+       x = "Volume observé (m^3)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+
+ggplot(data=Vhat[Vhat$Domaine!="Ibina",],
+       aes(x=V_obs, y=V_hat, color=Modèle, shape=Campagne))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red", linetype="dashed") +
+  ggtitle(label=("Volume de bois estimés selon différents tarifs de cubage
+  en fonction des volumes observés pour les arbres plantés en 2021")) +
+  labs(y = "Volume estimé (m^3)",
+       x = "Volume observé (m^3)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+
+```
+  
+  
+On constate sur les figures ci-dessus, que le tarif de cubage à deux entrées de @Peroches_2014, donnes des résultats proches des modèles que nous avons ajusté tandis que le tarif à une entrée de @Peroches_2014 a tendance à sous estimer les volumes.   
+
+Ces graphiques représentent les volumes estimés via les différents tarifs de cubage en fonction de ceux mesurés sur le terrain. La droite en pointillé rouge représentée sur les trois graphiques correspond à la fonction identité ($y=x$).   
+Au plus les points sont proches de cette droite au plus les valeurs de volume estimées sont proches des valeurs observées. 
+
+```{r VolvsDHP}
+V_hat <- data.frame(V_hat=c(V_hat_Bernhard,
+                            Vhat_Peroches1,
+                            Vhat_Peroches2,
+                            mod_4$fitted.values,
+                            V_hat_11,
+                            V_hat_14),
+                    Modèle=rep(c("Eq. une entrée (Bernhard)",
+                                 "Eq. une entrée (Peroches)",
+                                 "Eq. deux entrées (Peroches)",
+                                 "Eq. 4 (trois entrées)",
+                                 "Eq. 11 (deux entrées)",
+                                 "Eq. 14 (six entrées)"),
+                               each=length(V_hat_11)),
+                    Circ=c(data$dhp_10cm*pi, rep(data$DHP*pi,5)),
+                    H_t=rep(data$H_t,6))
+
+ggplot(data=V_hat, aes(x=Circ, y=V_hat, color=Modèle))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red", linetype="dashed") +
+  geom_line()+
+  ggtitle(label=("Volume de bois estimés selon différents tarifs de cubage
+  en fonction des circonférences")) +
+  labs(y = "Volume estimé (m^3)",
+       x = "Circonférence (cm)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+
+ggplot(data=V_hat[V_hat$Modèle %in% c("Eq. deux entrées (Peroches)",
+                                 "Eq. 4 (trois entrées)",
+                                 "Eq. 11 (deux entrées)",
+                                 "Eq. 14 (six entrées)"),],
+       aes(x=H_t, y=V_hat, color=Modèle))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red", linetype="dashed") +
+  geom_line()+
+  ggtitle(label=("Volume de bois estimés selon différents tarifs de cubage
+  en fonction des hauteurs des arbres")) +
+  labs(y = "Volume estimé (m^3)",
+       x = "Hauteur totales (m)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+```
+
+
+On distingue nettement sur cette figure, représentant les circonférences (à hauteur de poitrine pour nos équations et @Peroches_2014 et à 10cm pour @Bernhard_1993) en fonction des volumes de bois estimé, les modèles à une entrée dont les courbes (bleue et rose) sont lisses de ceux à plusieurs entrées qui présentent plus d'oscillations. 
+Les formes de courbe différentes entre les modèles à une et plusieurs entrées s'explique par l'influence des autres variables prises en compte sur le volume estimé, comme la hauteur totale des arbres ($H_t$) par exemple et par la forme de ces modèles en loi de puissance. 
+
+```{r VvsDH, echo=FALSE, include=FALSE}
+V_hat <- data.frame(V_hat=c(Vhat_Peroches2,
+                            mod_4$fitted.values,
+                            V_hat_11,
+                            V_hat_14),
+                    Modèle=rep(c("Eq. deux entrées (Peroches)",
+                                 "Eq. 4 (trois entrées)",
+                                 "Eq. 11 (deux entrées)",
+                                 "Eq. 14 (six entrées)"),
+                               each=length(V_hat_11)),
+                        col=rep(1:4,
+                               each=length(V_hat_11)),
+                    Circ=rep(data$DHP*pi,4),
+                    H_t=rep(data$H_t,4))
+# 3D plot Volume vs Circ et H_t
+# rgl::plot3d(V_hat$Circ, V_hat$H_t, V_hat$V_hat,  col=V_hat$col, type = "p",
+#             radius = .2 )
+# plot_ly(x=V_hat$Circ, y=V_hat$H_t, z =V_hat$V_hat, color=V_hat$Modèle, 
+#         type="scatter3d")
+```
+
+
+# Équations allométriques 
+
+## Calcul de la biomasse réelle de chaque arbre abattu
+
+
+```{r calc_B}
+library(readxl)
+library(knitr)
+library(dplyr)
+data_labo <- read_excel("D:/STAGE 2024 FRM/ANALYSES STATISTIQUES/Taff avec Jeanne/13_08_2024/Saisie_Equa_Allom2024_Arbres sur pied_V7.xlsx",
+                        sheet="Pesage_Terrain+Labo", skip=1)
+cubage <- read_excel("D:/STAGE 2024 FRM/ANALYSES STATISTIQUES/Taff avec Jeanne/13_08_2024/Saisie_Equa_Allom2024_Arbres sur pied_V7.xlsx",
+                     sheet="cubage", skip=1)
+# Calcul teneur en matière sèche (1-teneur en eau) de chaque compartiment
+data_labo$w_f <- data_labo$ms_échantillon_fût/data_labo$mf_échantillon_fût
+data_labo$w_GrBr4 <- data_labo$`ms_échantillon_GrBr4-7`/data_labo$`mf_échantillon_GrBr4-7`
+data_labo$w_GrBr7 <- data_labo$`ms_échantillon_7-12`/data_labo$`mf_échantillon7-12`
+data_labo$w_GrBr12 <- data_labo$`ms_échantillon>12`/data_labo$`mf_échantillon>12`
+data_labo$w_PtBr <- data_labo$`ms_échantillon_PtBr<4`/data_labo$`mf_échantillon_PtBr<4`
+data_labo$w_Phy_1 <- data_labo$mseche_Phy_1/data_labo$mf_terrain_Phy_1
+data_labo$w_Phy_2 <- data_labo$mseche_Phy_2/data_labo$mf_terrain_Phy_2
+data_labo$w_Phy_3 <- data_labo$mseche_Phy_3/data_labo$mf_terrain_Phy_3
+data_labo$w_Phy_4 <- data_labo$mseche_Phy_4/data_labo$mf_terrain_Phy_4
+data_labo$w_Phy_5 <- data_labo$mseche_Phy_5/data_labo$mf_terrain_Phy_5
+data_labo$w_Phy <- rowMeans(data_labo[,paste0("w_Phy_",1:5)], na.rm=TRUE)
+# Proportion de Grosses branches de diamètre [4,7], [7,12] et >12 pour chaque arbre 
+# On aurait du peser séparément les GrBr appartenant à chaque classe de diamètre 
+# ([4,7], [7,12] et >12)  et pas toutes les GrBr ensemble pour calculer leur poids sec
+# en appliquant la teneur en eau correspondante (w_GrBr4, w_GrBr7, w_GrBr12)
+cubage$classe_diam_billon <- ifelse(cubage$dhp_gros_bout_cm>12,">12",
+                                    ifelse(cubage$dhp_gros_bout_cm>7, "[7;12]",
+                                           "[4;7]"))
+# Somme des volumes des billons de GrBr par classe de diamètre
+vol_billon_by_class_diam <- cubage %>%
+  filter(Compartiment_billon=="GrBr") %>%
+  group_by(classe_diam_billon, id_arbre) %>%
+  summarise(sum_vol_billons = sum(`volume_billon_m³`))
+# Volume total des billons de GrBr
+vol_tot_billons_GrBr <- vol_billon_by_class_diam %>%
+  group_by(id_arbre) %>% 
+  summarise(vol_tot_billons = sum(sum_vol_billons))
+# Proportions de GrBr de chaque classe de diamètre par arbre
+prop_by_class <- left_join(vol_billon_by_class_diam,
+                                       vol_tot_billons_GrBr, by="id_arbre")
+prop_by_class$p_class <- prop_by_class$sum_vol_billons/prop_by_class$vol_tot_billons
+data_labo$p_GrBr4 <- data_labo$p_GrBr7 <- data_labo$p_GrBr12 <- NA
+
+for(i in 1:length(data_labo$ID_arbre)){
+prop_i <- prop_by_class[prop_by_class$id_arbre==data_labo$ID_arbre[i],]
+
+data_labo$p_GrBr4[i] <- ifelse(sum(prop_i$classe_diam_billon=="[4;7]")!=0, prop_i$p_class[prop_i$classe_diam_billon=="[4;7]"],0)
+data_labo$p_GrBr7[i] <- ifelse(sum(prop_i$classe_diam_billon=="[7;12]")!=0,
+                               prop_i$p_class[prop_i$classe_diam_billon=="[7;12]"],
+                               0)
+data_labo$p_GrBr12[i] <- ifelse(sum(prop_i$classe_diam_billon==">12")!=0,
+                                prop_i$p_class[prop_i$classe_diam_billon==">12"],
+                                0)
+}
+ 
+# Calcul des poids secs de chaque compartiment
+data_labo$Ms_f <- data_labo$masse_totale_fût*data_labo$w_f 
+data_labo$Ms_GrBr4 <- data_labo$masse_totale_GrBr*data_labo$p_GrBr4*data_labo$w_GrBr4 
+data_labo$Ms_GrBr7 <- data_labo$masse_totale_GrBr*data_labo$p_GrBr7*data_labo$w_GrBr7 
+data_labo$Ms_GrBr12 <- data_labo$masse_totale_GrBr*data_labo$p_GrBr12*data_labo$w_GrBr12
+data_labo$Ms_GrBr <- rowSums(data_labo[,c("Ms_GrBr4","Ms_GrBr7","Ms_GrBr12")],
+                             na.rm=TRUE)
+data_labo$Ms_PtBr <- data_labo$masse_totale_PtBr*data_labo$w_PtBr
+data_labo$Ms_Phy <- data_labo$`Masse totale phyllode`*data_labo$w_Phy
+# Pour connaître la masse de la souche
+# On multiplie son volume issu des données de cubage (formule de Smalian)
+# par la densité spécifique du bois des A. mangium (D_mang=0,507 g/cm3)
+# Zanne, A.E., Lopez-Gonzalez, G.*, Coomes, D.A., Ilic, J., Jansen, S., Lewis, S.L., Miller, R.B., Swenson, N.G., Wiemann, M.C., and Chave, J. 2009. Global wood density database. Dryad. Identifier: http://hdl.handle.net/10255/dryad.235.
+D_mang <- 0.507
+data_labo$Ms_souche <- D_mang*na.omit(cubage$volume_souche)*1000
+data_labo$AGB_kg <- rowSums(data_labo[,c("Ms_souche", "Ms_f",
+                                         "Ms_GrBr","Ms_PtBr", "Ms_Phy")],
+                         na.rm=TRUE)
+# AGB en tonnes de matière sèche (tms)
+data_labo$AGB <- data_labo$AGB_kg/1000
+data <- left_join(data, data_labo[,c("ID_arbre", "Ms_souche", "Ms_f","Ms_GrBr", 
+                             "Ms_GrBr4","Ms_GrBr7", "Ms_GrBr12",
+                             "Ms_PtBr", "Ms_Phy","AGB")],
+          by="ID_arbre")
+```
+
+## Répartition de la biomasse au sein des arbres 
+
+```{r hist_AGB_comp, echo=FALSE}
+df <- data %>%
+  group_by(Campagne) %>%
+  summarise(Ms_s = mean(Ms_souche, na.rm=TRUE),
+            Ms_f = mean(Ms_f, na.rm=TRUE), Ms_GrBr = mean(Ms_GrBr, na.rm=TRUE),
+            Ms_PtBr = mean(Ms_PtBr, na.rm=TRUE), Ms_Phy = mean(Ms_Phy, na.rm=TRUE),
+            AGB=mean(AGB, na.rm=TRUE), Ms_GrBr4= mean(Ms_GrBr4, na.rm=TRUE),
+            Ms_GrBr7=mean(Ms_GrBr7, na.rm=TRUE), Ms_GrBr12=mean(Ms_GrBr12, na.rm=TRUE))
+data_comp <- data.frame(Campagne=rep(df$Campagne, 5),
+                        Biomass=c(df$Ms_s,df$Ms_f,df$Ms_GrBr,df$Ms_PtBr, df$Ms_Phy),
+                   Compartment=rep(c("Stump", "Trunk","Large branches >4cm",
+                         "Small branches","Leaves"), each=4))
+data_comp2 <- data.frame(Campagne=rep(df$Campagne, 7),
+                        Biomass=c(df$Ms_s, df$Ms_f,df$Ms_GrBr4, df$Ms_GrBr7,
+                                  df$Ms_GrBr12,df$Ms_PtBr, df$Ms_Phy),
+                   Compartment=rep(c("Stump", "Trunk","Large branches in [4;7]cm",
+                                     "Large branches in [7;12] cm",
+                                     "Large branches >12cm",
+                         "Small branches","Leaves"), each=4))
+                   
+ggplot(data_comp, aes(x=Campagne, y=Biomass, fill=Compartment)) +
+  geom_col(position="stack") +
+    scale_fill_manual(values=c("chocolate4", "forestgreen",
+                               "chocolate", "brown4","brown"))
+ggplot(data_comp2, aes(x=Campagne, y=Biomass, fill=Compartment)) +
+  geom_col(position="stack") +
+    scale_fill_manual(values=c("chocolate4", "burlywood3", "darkgoldenrod4",
+                               "forestgreen",
+                               "chocolate", "brown4","brown"))
+```
+
+## Comparaison des teneurs en eau des différents compartiments
+
+```{r boxplot_w}
+# Box plots by compartment
+
+get_box_stats <- function(y, upper_limit = 100) {
+  return(data.frame(
+    y = 0.97 * upper_limit,
+    label = paste(
+      "Count =", length(y), "\n",
+      "Mean =", round(mean(y), 2), "\n",
+      "Sd =", round(sd(y), 2), "\n",
+      "Max =", round(max(y), 2), "\n"
+    )
+  ))
+}
+data_comp_w <- data.frame(w=(1-c(data_labo$w_f, data_labo$w_GrBr12,
+                              data_labo$w_GrBr7, data_labo$w_GrBr4, 
+                              data_labo$w_PtBr, data_labo$w_Phy))*100,
+                          Compartiment=rep(c("Tronc", "GrBr>12cm", "GrBr [7;12]cm",
+                                               "GrBr [4;7]cm", "PtBr<4cm",
+                                             "Phyllodes"), each=nrow(data)))
+
+Boxplot_DHP <- ggplot(data_comp_w, aes(x=Compartiment, y=w, fill=Compartiment)) +
+  ggtitle("Comparaison des teneurs en eau des différents compartiments", ) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point",
+               shape = 18, size = 2.5, color = "#FC4E07") +
+  theme(legend.title = element_text(size = 15),
+        legend.text = element_text(size = 14)) +
+  ylab("Teneur en eau (%)") + xlab("Compartiment") +
+  stat_summary(fun.data = get_box_stats, geom = "text",
+               hjust = 0.5, vjust = 0.9, size=3) 
+Boxplot_DHP
+```
+
+## Matrice de design 
+
+On utilise les mêmes variables explicatives que pour l'ajustement du tarif de cubage et on considère la biomasse aérienne totale (AGB) comme variable réponse. 
+
+## Ajustement équations allométriques envisagées 
+
+### Définition des modèles envisagés 
+
+![Tarifs de cubage envisagés](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/tab_mod_AGB.png){height=1000px}
+
+Avec :  
+AGB : biomasse aérienne (tonnes de matière sèche t.m.s),  
+D : DHP (cm) ou somme quadratique des diamètres des tiges mesurées,  
+H_t : hauteur totale de l'arbre (m),  
+H_f : hauteur du fût de l’arbre (m),  
+H_c : profondeur de la couronne de l’arbre (m),   
+C_dia : diamètre de la couronne de l’arbre (m) deux fois la moyenne des quatre rayons mesurés sur la couronne),
+S_c=  $\pi \times C_{r_{NS}} \times C_{r_{EO}}$∶ surface de la couronne approchée à partir de la surface projetée 
+des quarts d'ellipse , où $C_{r_{NS}}$ est la moyenne des rayons mesurés au Nord et au Sud et $C_{r_{EO}}$ correspond à la moyenne des rayons mesurés dans les directions Est et Ouest.  
+$V_c=\frac{1}{2}\times\frac{4}{3}\times S_c\times H_c$ : volume approché de la couronne (demi-ellipsoïde) (cm3),
+$D^2\times H_t$, $D^2\times H_f$, $D^2\times H_c$, $D^2\times \frac{H_c + C_{dia}}{2}$ (m),    
+I_c : classe de la couronne (I_c=D, C, I ou S), indiquant la position de l’arbre dans la canopée,    
+N_tiges : nombre de tiges pour lesquelles le diamètre a été mesuré,  
+N_arbres : nombre d’arbres vivants présents dans un rayon de 4m autour de celui considéré,   
+A : âge de la plantation (mois),    
+CF : facteur de correction du biais [@Baskerville_1972].    
+
+### Ajustement des modèles polynomiaux 
+
+```{r setup5, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      include=FALSE,
+                      fig.align="center",
+                      fig.width = 6,
+                      fig.height = 6,
+                      out.width = '70%',
+                      highlight = TRUE)
+```
+
+```{r fit-AGB-mod_poly}
+library(nlme)
+library(ggplot2)
+library(dplyr)
+library(ggpubr)
+
+ggplotRegression <- function(mod, num){
+  require(ggplot2)
+  #require(gridExtra)
+  g <- ggplot(mod$model, aes(x=mod$fitted.values, y=mod$model[,1]))+
+    geom_point()+
+    stat_smooth(method="lm", col='blue')+
+    ggtitle(label=paste("Modèle ", num, "Biomasse aérienne vs",
+                        toString(names(mod$model)[-1])),
+            subtitle=paste("R2=", signif(summary(mod)$r.squared),
+                           ", RMSE=", signif(sqrt(mean(mod$residuals^2))),
+                           ", AIC=", signif(AIC(mod)),
+                           ", BIC=", signif(BIC(mod))))+
+    labs(x = "Biomasse aérienne estimé",
+         y = "Biomasse aérienne observé (AGB)")+
+    theme(plot.subtitle = element_text(size=9.5, face="bold"),
+          plot.title = element_text(size=10.5, face="bold"))
+  par(mfrow=c(1,2))
+  plot(mod,1)
+  plot(mod,2)
+  par(mfrow=c(1,1))
+  g
+}
+
+##Ajuster les modèles et visualiser les résultats
+
+mod_1 <- lm(AGB ~ DHP, data = data)
+s_1 <- summary(mod_1)
+s_1
+# Deux manières équivalentes de calculer le RMSE d'un modèle linéaire :
+# RMSE_1 <-  sqrt(mean((mod_1$model$AGB - mod_1$fitted.values)^2))
+# On garde la plus simple :
+RMSE_1 <- sqrt(mean(mod_1$residuals^2))
+Rsquared_1 <- s_1$r.squared
+AIC_1 <- AIC(mod_1)
+BIC_1 <- BIC(mod_1)
+ggplot(data, aes(x = DHP, y = AGB)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle linéaire : Biomasse aérienne (AGB) vs DHP",
+       x = "DHP (cm)", y = "Biomasse aérienne (AGB)")
+ggplotRegression(mod_1, 1)
+```
+
+
+```{r fit-AGB-mod_poly2}
+# Modèle polynomiale (degré 2)
+mod_2 <- lm(AGB ~ poly(DHP, 2), data = data)
+s_2 <- summary(mod_2)
+s_2
+RMSE_2 <- sqrt(mean(mod_2$residuals^2))
+Rsquared_2 <- s_2$r.squared
+AIC_2 <- AIC(mod_2)
+BIC_2 <- BIC(mod_2)
+ggplot(data, aes(x = DHP, y = AGB)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle Polynomiale de degré 2 : Biomasse aérienne (AGB) vs DHP",
+       x = "DHP (cm)", y = "Biomasse aérienne (AGB)")
+ggplotRegression(mod_2, 2)
+```
+
+
+```{r fit-AGB-mod_3}
+# Modèle polynomiale (degré 3)
+mod_3 <- lm(AGB ~ poly(DHP, 3), data = data)
+s_3 <- summary(mod_3)
+s_3
+Rsquared_3 <- s_3$r.squared
+AIC_3 <- AIC(mod_3)
+BIC_3 <- BIC(mod_3)
+RMSE_3 <- sqrt(mean(mod_3$residuals^2))
+ggplot(data, aes(x = DHP, y = AGB)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 3), se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle Polynomiale de degré 3 : Biomasse aérienne (AGB) vs DHP",
+       x = "DHP (cm)", y = "Biomasse aérienne (AGB)")
+ggplotRegression(mod_3, 3)
+```
+
+
+```{r fit-AGB-mod_4}
+# Modèle polynomiale 4
+mod_4 <- lm(AGB ~ I(DHP^2) + I(DHP^3) + D2.Hf_m + D2.Hc_m, data = data)
+s_4 <- summary(mod_4)
+Rsquared_4 <- s_4$r.squared
+AIC_4 <- AIC(mod_4)
+BIC_4 <- BIC(mod_4)
+RMSE_4 <- sqrt(mean(mod_4$residuals^2))
+ggplotRegression(mod_4, 4)
+```
+
+
+```{r fit-AGB-mod_5, echo=TRUE, include=TRUE}
+# Modèle polynomiale 5
+mod_5 <- lm(AGB ~ I(DHP^2) + I(DHP^3) + D2.Ht_m, data = data)
+s_5 <- summary(mod_5)
+Rsquared_5 <- s_5$r.squared
+AIC_5 <- AIC(mod_5)
+BIC_5 <- BIC(mod_5)
+RMSE_5 <- sqrt(mean(mod_5$residuals^2))
+ggplotRegression(mod_5, 5)
+```
+
+
+
+
+```{r fit-AGB-mod_6}
+# Modèle polynomiale 6
+mod_6 <- lm(AGB ~ I(DHP^2) + I(DHP^3) + D2.Ht_m + N_tiges, data = data)
+s_6 <- summary(mod_6)
+Rsquared_6 <- s_6$r.squared
+AIC_6 <- AIC(mod_6)
+BIC_6 <- BIC(mod_6)
+RMSE_6 <- sqrt(mean(mod_6$residuals^2))
+ggplotRegression(mod_6, 6)
+```
+
+
+
+```{r fit-AGB-mod_7}
+
+# Modèle polynomiale 7
+mod_7 <- lm(AGB ~ I(DHP^2) + I(DHP^3) + D2.Ht_m + N_tiges + Age, data = data)
+s_7 <- summary(mod_7)
+Rsquared_7 <- s_7$r.squared
+AIC_7 <- AIC(mod_7)
+BIC_7 <- BIC(mod_7)
+RMSE_7 <- sqrt(mean(mod_7$residuals^2))
+ggplotRegression(mod_7, 7)
+```
+
+```{r fit-AGB-mod_8, echo=TRUE, include=TRUE}
+# Modèle polynomiale 8
+mod_8 <- lm(AGB ~ I(DHP^2) + I(DHP^3) + D2.Ht_m + N_tiges + Age + N_arbres + I_c,
+            data = data)
+s_8 <- summary(mod_8)
+Rsquared_8 <- s_8$r.squared
+AIC_8 <- AIC(mod_8)
+BIC_8 <- BIC(mod_8)
+RMSE_8 <- sqrt(mean(mod_8$residuals^2))
+ggplotRegression(mod_8, 8)
+
+```
+
+
+```{r fit-AGB-mod_9, echo=TRUE, include=TRUE}
+# Modèle polynomiale 9
+mod_9 <- lm(AGB ~ I(DHP^2) + I(DHP^3) + D2.Hf_m + D2.Hc_m + N_tiges + Age + N_arbres + I_c,
+            data = data)
+s_9 <- summary(mod_9)
+Rsquared_9 <- s_9$r.squared
+AIC_9 <- AIC(mod_9)
+BIC_9 <- BIC(mod_9)
+RMSE_9 <- sqrt(mean(mod_9$residuals^2))
+# same result as 
+#RMSE_9 <- sqrt(mean((mod_9$fit-AGBted.values-mod_9$model$AGB)^2))
+ggplotRegression(mod_9, 9)
+```
+
+```{r fit-AGB-mod_10}
+
+# Modèle polynomiale 10
+mod_10 <- lm(AGB ~  I(DHP^2) + D2.Hf_m + V_c +  N_tiges + Age + N_arbres + I_c,
+            data = data)
+s_10 <- summary(mod_10)
+Rsquared_10 <- s_10$r.squared
+AIC_10 <- AIC(mod_10)
+BIC_10 <- BIC(mod_10)
+RMSE_10 <- sqrt(mean(mod_10$residuals^2))
+# same result as 
+#RMSE_10 <- sqrt(mean((mod_10$fit-AGBted.values-mod_10$model$AGB)^2))
+ggplotRegression(mod_10, 10)
+```
+
+### Ajustement des modèles en loi de puissance
+
+```{r fit-AGB-mod_11}
+ggplotLogRegression <- function(mod, AGB_hat, num){
+  require(ggplot2)
+  g <- ggplot(mod$model, aes(x=AGB_hat, y=data$AGB))+
+    geom_point()+
+    stat_smooth(method="lm", col='blue')+
+    ggtitle(label=paste("Modèle ", num,
+                        "Biomasse aérienne vs",
+                        toString(gsub("log", "", names(mod$model)[-1]))),
+            subtitle=paste("R2=", signif(summary(mod)$r.squared),
+                           ", RMSE=", 
+                           signif(sqrt(mean((AGB_hat-data$AGB)^2))),
+                           ", AIC=", signif(AIC(mod)),
+                           ", BIC=", signif(BIC(mod)))) +
+    labs(x = "Biomasse aérienne estimé",
+         y = "Biomasse aérienne observé (AGB)")+
+    theme(plot.subtitle = element_text(size=9.5, face="bold"),
+          plot.title = element_text(size=10.5, face="bold"))
+  par(mfrow=c(1,2))
+  plot(mod,which=1)
+  plot(mod,which=2)
+  par(mfrow=c(1,1))
+  g
+}
+
+mod_11 <- lm(log(AGB) ~ log(I(DHP^2)), data = data)
+s_11 <- summary(mod_11)
+Rsquared_11 <- s_11$r.squared
+AIC_11 <- AIC(mod_11)
+BIC_11 <- BIC(mod_11)
+CF_11 <- exp(mean((mod_11$fitted.values - mod_11$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(mod_11$coefficients[1])*(data$DHP^2)^mod_11$coefficients[2]*CF_11
+RMSE_11 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplot(data, aes(x = log(DHP^2), y = log(AGB))) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle de Puissance 11: Biomasse aérienne (AGB) vs DHP",
+       x = "log(DHP^2) (cm))", y = "log(AGB)")
+ggplotLogRegression(mod_11, AGB_hat, 11)
+```
+
+```{r fit-AGB-mod_12}
+mod_12 <- lm(log(AGB) ~ log(D2.Ht_m), data = data)
+s_12 <- summary(mod_12)
+Rsquared_12 <- s_12$r.squared
+AIC_12 <- AIC(mod_12)
+BIC_12 <- BIC(mod_12)
+CF_12 <- exp(mean((mod_12$fitted.values - mod_12$model$`log(AGB)`)^2)/2)
+AGB_hat_12 <- exp(mod_12$coefficients[1])*(data$D2.Ht_m)^mod_12$coefficients[2]*CF_12
+RMSE_12 <- sqrt(mean((AGB_hat_12 - data$AGB)^2))
+
+ggplot(data, aes(x = log(D2.Ht_m), y = log(AGB))) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle de Puissance 12: Biomasse aérienne (AGB) vs D^2.H_t",
+       x = "log(DHP^2.H_t) (cm))", y = "log(AGB)")
+ggplotLogRegression(mod_12, AGB_hat_12, 12)
+```
+
+
+```{r fit-AGB-mod_13}
+mod_13 <- lm(log(AGB) ~ log(D2.Ht_m) + N_tiges , data = data)
+s_13 <- summary(mod_13)
+Rsquared_13 <- s_13$r.squared
+AIC_13 <- AIC(mod_13)
+BIC_13 <- BIC(mod_13)
+CF_13 <- exp(mean((mod_13$fitted.values - mod_13$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(mod_13$coefficients[1] + mod_13$coefficients[3]*data$N_tiges)*
+  (data$D2.Ht_m)^mod_13$coefficients[2]*CF_13
+RMSE_13 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_13, AGB_hat, 13)
+```
+
+```{r fit-AGB-mod_14}
+mod_14 <- lm(log(AGB) ~ log(D2.Ht_m) + N_tiges + Age, data = data)
+s_14 <- summary(mod_14)
+Rsquared_14 <- s_14$r.squared
+AIC_14 <- AIC(mod_14)
+BIC_14 <- BIC(mod_14)
+CF_14 <- exp(mean((mod_14$fitted.values - mod_14$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(mod_14$coefficients[1] + mod_14$coefficients[3]*data$N_tiges + mod_14$coefficients[4]*data$Age)*(data$D2.Ht_m)^mod_14$coefficients[2]*CF_14
+RMSE_14 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_14, AGB_hat, 14)
+```
+
+```{r fit-AGB-mod_15}
+mod_15 <- lm(log(AGB) ~ log(D2.Ht_m) + N_tiges + Age + N_arbres + I_c,
+             data = data)
+s_15 <- summary(mod_15)
+Rsquared_15 <- s_15$r.squared
+AIC_15 <- AIC(mod_15)
+BIC_15 <- BIC(mod_15)
+CF_15 <- exp(mean((mod_15$fitted.values - mod_15$model$`log(AGB)`)^2)/2)
+AGB_hat_15 <- exp(model.matrix(mod_15)[,-2] %*% mod_15$coefficients[-2])*
+  (data$D2.Ht_m)^mod_15$coefficients[2]*CF_15
+RMSE_15 <- sqrt(mean((AGB_hat_15 - data$AGB)^2))
+ggplotLogRegression(mod_15, AGB_hat_15, 15)
+```
+
+
+```{r fit-AGB-mod_16}
+mod_16 <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.Hc_m), data = data)
+s_16 <- summary(mod_16)
+Rsquared_16 <- s_16$r.squared
+AIC_16 <- AIC(mod_16)
+BIC_16 <- BIC(mod_16)
+CF_16 <- exp(mean((mod_16$fitted.values - mod_16$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(mod_16$coefficients[1])*
+  (data$D2.Hc_m)^mod_16$coefficients[3]*
+  (data$D2.Hf_m)^mod_16$coefficients[2]*CF_16
+RMSE_16 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_16, AGB_hat, 16)
+```
+
+
+```{r fit-AGB-mod_17, echo=TRUE, include=TRUE}
+mod_17 <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m), data = data)
+s_17 <- summary(mod_17)
+Rsquared_17 <- s_17$r.squared
+AIC_17 <- AIC(mod_17)
+BIC_17 <- BIC(mod_17)
+CF_17 <- exp(mean((mod_17$fitted.values - mod_17$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(mod_17$coefficients[1])*
+  (data$D2.Hf_m)^mod_17$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_17$coefficients[3]*CF_17
+RMSE_17 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_17, AGB_hat, 17)
+```
+
+```{r fit-AGB-mod_18}
+mod_18 <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.Hc_m) + N_tiges, data = data)
+s_18 <- summary(mod_18)
+Rsquared_18 <- s_18$r.squared
+AIC_18 <- AIC(mod_18)
+BIC_18 <- BIC(mod_18)
+CF_18 <- exp(mean((mod_18$fitted.values - mod_18$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(model.matrix(mod_18)[,-c(2,3)] %*% mod_18$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_18$coefficients[2]*
+  (data$D2.Hc_m)^mod_18$coefficients[3]*CF_18
+RMSE_18 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_18, AGB_hat, 18)
+```
+
+```{r fit-AGB-mod_19}
+mod_19 <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + N_tiges
+             , data = data)
+s_19 <- summary(mod_19)
+Rsquared_19 <- s_19$r.squared
+AIC_19 <- AIC(mod_19)
+BIC_19 <- BIC(mod_19)
+CF_19 <- exp(mean((mod_19$fitted.values - mod_19$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(model.matrix(mod_19)[,-c(2,3)] %*% mod_19$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_19$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_19$coefficients[3]*CF_19
+RMSE_19 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_19, AGB_hat, 19)
+```
+
+```{r fit-AGB-mod_20}
+mod_20 <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.Hc_m) + N_tiges + Age,
+             data = data)
+s_20 <- summary(mod_20)
+Rsquared_20 <- s_20$r.squared
+AIC_20 <- AIC(mod_20)
+BIC_20 <- BIC(mod_20)
+CF_20 <- exp(mean((mod_20$fitted.values - mod_20$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(model.matrix(mod_20)[,-c(2,3)] %*% mod_20$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_20$coefficients[2]*
+  (data$D2.Hc_m)^mod_20$coefficients[3]*CF_20
+RMSE_20 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_20, AGB_hat, 20)
+```
+
+```{r fit-AGB-mod_21}
+mod_21 <- lm(log(AGB) ~ log(D2.Hf_m) + log(V_c) + N_tiges + Age,
+             data = data)
+s_21 <- summary(mod_21)
+Rsquared_21 <- s_21$r.squared
+AIC_21 <- AIC(mod_21)
+BIC_21 <- BIC(mod_21)
+CF_21 <- exp(mean((mod_21$fitted.values - mod_21$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(model.matrix(mod_21)[,-c(2,3)] %*% mod_21$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_21$coefficients[2]*
+  (data$V_c)^mod_21$coefficients[3]*CF_21
+RMSE_21 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_21, AGB_hat, 21)
+```
+
+
+```{r fit-AGB-mod_22}
+mod_22 <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + N_tiges + Age,
+             data = data)
+s_22 <- summary(mod_22)
+Rsquared_22 <- s_22$r.squared
+AIC_22 <- AIC(mod_22)
+BIC_22 <- BIC(mod_22)
+CF_22 <- exp(mean((mod_22$fitted.values - mod_22$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(model.matrix(mod_22)[,-c(2,3)] %*% mod_22$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_22$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_22$coefficients[3]*CF_22
+RMSE_22 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_22, AGB_hat, 22)
+```
+
+```{r fit-AGB-mod_23}
+mod_23 <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.Hc_m) + N_tiges + Age 
+             + N_arbres + I_c, data = data)
+s_23 <- summary(mod_23)
+Rsquared_23 <- s_23$r.squared
+AIC_23 <- AIC(mod_23)
+BIC_23 <- BIC(mod_23)
+CF_23 <- exp(mean((mod_23$fitted.values - mod_23$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(model.matrix(mod_23)[,-c(2,3)] %*% mod_23$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_23$coefficients[2]*
+  (data$D2.Hc_m)^mod_23$coefficients[3]*CF_23
+RMSE_23 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_23, AGB_hat, 23)
+```
+
+```{r fit-AGB-mod_24, echo=TRUE, include=TRUE}
+mod_24 <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + N_tiges + Age 
+             + N_arbres + I_c, data = data)
+s_24 <- summary(mod_24)
+Rsquared_24 <- s_24$r.squared
+AIC_24 <- AIC(mod_24)
+BIC_24 <- BIC(mod_24)
+CF_24 <- exp(mean((mod_24$fitted.values - mod_24$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(model.matrix(mod_24)[,-c(2,3)] %*% mod_24$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_24$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_24$coefficients[3]*CF_24
+RMSE_24 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_24, AGB_hat, 24)
+```
+
+```{r fit-AGB-mod_25}
+mod_25 <- lm(log(AGB) ~ log(D2.Hf_m) + log(V_c) + N_tiges + Age 
+             + N_arbres + I_c, data = data)
+s_25 <- summary(mod_25)
+Rsquared_25 <- s_25$r.squared
+AIC_25 <- AIC(mod_25)
+BIC_25 <- BIC(mod_25)
+CF_25 <- exp(mean((mod_25$fitted.values - mod_25$model$`log(AGB)`)^2)/2)
+AGB_hat <- exp(model.matrix(mod_25)[,-c(2,3)] %*% mod_25$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_25$coefficients[2]*
+  (data$V_c)^mod_25$coefficients[3]*CF_25
+RMSE_25 <- sqrt(mean((AGB_hat - data$AGB)^2))
+ggplotLogRegression(mod_25, AGB_hat, 25)
+```
+
+### Ajustement de modèles intégrant un effet site 
+
+```{r setup6}
+knitr::opts_chunk$set(echo = TRUE,
+                      include=TRUE,
+                      fig.align="center",
+                      fig.width = 6,
+                      fig.height = 6,
+                      out.width = '70%',
+                      highlight = TRUE)
+```
+
+```{r fit-AGB-mod_8_site}
+
+# Modèle polynomiale 4 avec effet domaine fixe
+mod_8_site <- lm(AGB ~ I(DHP^2) + I(DHP^3) + D2.Ht_m + N_tiges + Age + N_arbres + I_c + Domaine,
+                 data = data)
+s_8_site <- summary(mod_8_site)
+Rsquared_8_site <- s_8_site$r.squared
+AIC_8_site <- AIC(mod_8_site)
+BIC_8_site <- BIC(mod_8_site)
+RMSE_8_site <- sqrt(mean(mod_8_site$residuals^2))
+ggplotRegression(mod_8_site, 8)
+s_8_site
+
+library(r2glmm)
+library(lme4)
+ggplotRandRegression <- function(mod, AGB_hat, num){
+  require(ggplot2)
+  g <- ggplot(mod@frame, aes(x=AGB_hat, y=data$AGB))+
+    geom_point()+
+    stat_smooth(method="lm", col='blue')+
+    ggtitle(label=paste("Modèle", num, "avec effet site aléatoire",
+                        "Biomasse aérienne vs",
+                        toString(gsub("log", "", names(mod@frame)[-1]))),
+            subtitle=paste("R2=",
+                           signif(performance::r2_nakagawa(mod)$R2_conditional),
+                           ", RMSE=",
+                           signif(sqrt(mean((AGB_hat-data$AGB)^2))),
+                           ", AIC=", signif(AIC(mod)),
+                           ", BIC=", signif(BIC(mod)))) +
+    labs(x = "Biomasse aérienne estimé",
+         y = "Biomasse aérienne observé (AGB)")+
+    theme(plot.subtitle = element_text(size=9.5, face="bold"),
+          plot.title = element_text(size=10.5, face="bold"))
+  plot(mod)
+  g
+}
+# Modèle polynomiale 4 avec effet domaine aléatoire 
+mod_8_site_rand <- lme4::lmer(AGB ~ I(DHP^2) + I(DHP^3) + D2.Ht_m + N_tiges + Age + N_arbres + I_c + 
+                                (1|Domaine), data = data)
+s_8_site_rand <- summary(mod_8_site_rand)
+Rsquared_8_site_rand <- signif(r2glmm::r2beta(mod_8_site_rand, method="nsj",
+                                              partial=FALSE)[1,"Rsq"])
+AIC_8_site_rand <- AIC(mod_8_site_rand)
+BIC_8_site_rand <- BIC(mod_8_site_rand)
+RMSE_8_site_rand <- sqrt(mean(residuals(mod_8_site_rand)^2))
+ggplotRandRegression(mod_8_site_rand, fitted(mod_8_site_rand), 8)
+s_8_site_rand
+confint(mod_8_site_rand)
+```
+
+
+```{r fit-AGB-mod_24_site}
+# Modèle en loi de puissance 24 avec effet domaine fixe
+mod_24_site <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + N_tiges + Age 
+             + N_arbres + I_c +  Domaine, data = data)
+s_24_site <- summary(mod_24_site)
+Rsquared_24_site <- s_24_site$r.squared
+AIC_24_site <- AIC(mod_24_site)
+BIC_24_site <- BIC(mod_24_site)
+CF_24_site <- exp(mean((mod_24_site$fitted.values -
+                          mod_24_site$model$`log(AGB)`)^2)/2)
+AGB_hat_24_site <- exp(model.matrix(mod_24_site)[,-c(2,3)] %*% mod_24_site$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_24_site$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_24_site$coefficients[3]*CF_24_site
+RMSE_24_site <- sqrt(mean((AGB_hat_24_site - data$AGB)^2))
+
+ggplotLogRegression(mod_24_site, AGB_hat_24_site, 24)
+s_24_site
+
+# Modèle en loi de puissance 24 avec effet domaine aléatoire 
+mod_24_site_rand <- lme4::lmer(log(AGB) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + N_tiges + Age 
+             + N_arbres + I_c + (1|Domaine), data = data)
+s_24_site_rand <- summary(mod_24_site_rand)
+Rsquared_24_site_rand <- signif(r2glmm::r2beta(mod_24_site_rand,
+                                               method="nsj",
+                                               partial=FALSE)[1,"Rsq"])
+AIC_24_site_rand <- AIC(mod_24_site_rand)
+BIC_24_site_rand <- BIC(mod_24_site_rand)
+CF_24_site_rand <- exp(mean((fitted(mod_24_site_rand) -
+                               mod_24_site_rand@frame$`log(AGB)`)^2)/2)
+design.matrix <- model.matrix(mod_24_site)
+colnames(design.matrix)[1] <- "DomaineBaCaSi"
+design.matrix <- as.matrix(design.matrix[, -c(2,3)])
+design.matrix[,"DomaineBaCaSi"] <- 1-design.matrix[,"DomaineIbina"]-design.matrix[,"DomaineOka 2"]
+AGB_hat_24_site_rand <- exp(design.matrix[,c("DomaineBaCaSi","DomaineIbina", "DomaineOka 2")] %*% 
+                            coef(mod_24_site_rand)$Domaine[,"(Intercept)"] + 
+                              design.matrix[,-c(1,8,9)] %*%
+                              t(coef(mod_24_site_rand)$Domaine[1,-c(1:3)]))*
+  (data$D2.Hf_m)^coef(mod_24_site_rand)$Domaine[2,2]*
+  (data$D2.meanHcCdia_m)^coef(mod_24_site_rand)$Domaine[2,3]*CF_24_site_rand
+RMSE_24_site_rand <- sqrt(mean((AGB_hat_24_site_rand - data$AGB)^2))
+ggplotRandRegression(mod_24_site_rand, AGB_hat_24_site_rand, 24)
+s_24_site_rand
+confint(mod_24_site_rand)
+```
+
+```{r fit-AGB-mod_17_site}
+# Modèle en loi de puissance 17 avec effet domaine fixe
+mod_17_site <- lm(log(AGB) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + Domaine,
+                  data = data)
+s_17_site <- summary(mod_17_site)
+Rsquared_17_site <- s_17_site$r.squared
+AIC_17_site <- AIC(mod_17_site)
+BIC_17_site <- BIC(mod_17_site)
+CF_17_site <- exp(mean((mod_17_site$fitted.values - 
+                          mod_17_site$model$`log(AGB)`)^2)/2)
+AGB_hat_17_site <- exp(model.matrix(mod_17_site)[,-c(2,3)] %*% 
+                       mod_17_site$coefficients[-c(2,3)])*
+  (data$D2.Hf_m)^mod_17_site$coefficients[2]*
+  (data$D2.meanHcCdia_m)^mod_17_site$coefficients[3]*CF_17_site
+RMSE_17_site <- sqrt(mean((AGB_hat_17_site - data$AGB)^2))
+ggplotLogRegression(mod_17_site, AGB_hat_17_site, 17)
+s_17_site
+
+# Modèle en loi de puissance 14 avec effet domaine aléatoire 
+mod_17_site_rand <- lme4::lmer(log(AGB) ~ log(D2.Hf_m) + log(D2.meanHcCdia_m) + (1|Domaine),
+                               data = data)
+s_17_site_rand <- summary(mod_17_site_rand)
+Rsquared_17_site_rand <- signif(r2glmm::r2beta(mod_17_site_rand,
+                                        method="nsj", partial=FALSE)[1,"Rsq"])
+AIC_17_site_rand <- AIC(mod_17_site_rand)
+BIC_17_site_rand <- BIC(mod_17_site_rand)
+CF_17_site_rand <- exp(mean((fitted(mod_17_site_rand) - 
+                               mod_17_site_rand@frame$`log(AGB)`)^2)/2)
+design.matrix <- model.matrix(mod_17_site)
+colnames(design.matrix)[1] <- "DomaineBaCaSi"
+design.matrix <- design.matrix[, -c(2:3)]
+design.matrix[,"DomaineBaCaSi"] <- 1-design.matrix[,2]-design.matrix[,3]
+AGB_hat_17_site_rand <- exp(design.matrix %*% 
+                            coef(mod_17_site_rand)$Domaine[,1])*
+  (data$D2.Hf_m)^coef(mod_17_site_rand)$Domaine[1,2]
+(data$D2.meanHcCdia_m)^coef(mod_17_site_rand)$Domaine[1,3]*CF_17_site_rand
+RMSE_17_site_rand <- sqrt(mean((AGB_hat_17_site_rand - data$AGB)^2))
+ggplotRandRegression(mod_17_site_rand, AGB_hat_17_site_rand, 17)
+s_17_site_rand
+confint(mod_17_site_rand)
+```
+
+
+Les modèles intégrant un effet domaine fixe ou aléatoire, ne semblent pas plus pertinents que ceux ne prenant pas en compte cette variable. 
+De plus on peut voir que les paramètres associés aux domaines ne sont pas significatifs dans la majorité des cas. 
+
+## Sélection de modèle 
+
+```{r setup7, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      include=TRUE,
+                      fig.align="center",
+                      fig.width = 8,
+                      fig.height = 8,
+                      out.width = '100%',
+                      highlight = TRUE)
+```
+
+
+### Définition des modèles ajustés
+
+![Tarifs de cubage ajustés](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/tab_mod_AGB.png){height=1500px}
+
+Avec :AGB : biomasse aérienne (tonnes de matière sèche t.m.s),  
+D : DHP (cm) ou somme quadratique des diamètres des tiges mesurées,  
+H_t : hauteur totale de l'arbre (m),  
+H_f : hauteur du fût de l’arbre (m),  
+H_c : profondeur de la couronne de l’arbre (m),   
+C_dia : diamètre de la couronne de l’arbre (m) deux fois la moyenne des quatre rayons mesurés sur la couronne),
+S_c=  $ \pi \times C_{r_{NS}} \times C_{r_{EO}}$∶ surface de la couronne approchée à partir de la surface projetée 
+des quarts d'ellipse , où $C_{r_{NS}}$ est la moyenne des rayons mesurés au Nord et au Sud et $C_{r_{EO}}$ correspond à la moyenne des rayons mesurés dans les directions Est et Ouest.  
+$V_c=\frac{1}{2} \times \frac{4}{3} \times S_c \times H_c$ : volume approché de la couronne (demi-ellipsoïde) (cm3),
+$D^2\times H_t$, $D^2\times H_f$, $D^2 \times H_c$, $D^2 \times \frac{H_c + C_{dia}}{2}$ (m),  
+I_c : classe de la couronne (I_c=D, C, I ou S), indiquant la position de l’arbre dans la canopée,   
+N_tiges : nombre de tiges pour lesquelles le diamètre a été mesuré,  
+N_arbres : nombre d’arbres vivants présents dans un rayon de 4m autour de celui considéré,   
+A : âge de la plantation (mois),    
+CF : facteur de correction du biais [@Baskerville_1972].   
+
+### Identification des variables significatives et paramètres des modèles
+
+```{r signif-mod-AGB, echo=FALSE}
+# Table pour modèles linéaires
+tab_signif_lin <- matrix(" " ,20, 15)
+colnames(tab_signif_lin) <- c("Eq.", "(Intercept)", "D (cm)", "D^2 (cm)", "D^3 (cm)",
+                              "D^2.Ht_m (m)", "D^2.Hf_m (m)", "D^2.Hc_m (m)", 
+                              "N_tiges","Age (mois)", "N_arbres",
+                              "I_cD", "I_cI", "I_cS", "V_c")
+tab_signif_lin <- as.data.frame(tab_signif_lin)
+tab_signif_lin$Eq. <- rep(1:10, each=2)
+tab_signif_lin[1,c(2,3)] <- s_1$coefficients[,"Estimate"]
+tab_signif_lin[2,c(2,3)] <- "***"
+tab_signif_lin[3,c(2,3,4)] <- s_2$coefficients[,"Estimate"]
+tab_signif_lin[4,c(2,3,4)] <- "***"
+tab_signif_lin[5,c(2:5)] <- s_3$coefficients[,"Estimate"]
+tab_signif_lin[6,c(2:4)] <- "***"
+tab_signif_lin[7,c(2,4:5,7:8)] <- s_4$coefficients[,"Estimate"]
+tab_signif_lin[8,c(4:5,7:8)] <- c("*", " ", rep("***",2))
+tab_signif_lin[9,c(2,4:6)] <- s_5$coefficients[,"Estimate"]
+tab_signif_lin[10,c(4:6)] <- c("**", " ", "***")
+tab_signif_lin[11,c(2,4:6,9)] <- s_6$coefficients[,"Estimate"]
+tab_signif_lin[12,c(4:6,9)] <- c("**", " ", "***", " ")
+tab_signif_lin[13,c(2,4:6,9:10)] <- s_7$coefficients[,"Estimate"]
+tab_signif_lin[14,c(4:6,9:10)] <- c("**", " ", "***", rep(" ",2))
+tab_signif_lin[15,c(2,4:6,9:14)] <- s_8$coefficients[,"Estimate"]
+tab_signif_lin[16,c(4:6,9:12)] <- c("**",".", "***", rep(" ",2), "*", "**")
+tab_signif_lin[17,c(2,4:5,7:14)] <- s_9$coefficients[,"Estimate"]
+tab_signif_lin[18,c(4:5,7:12)] <- c("**", ".", "***", "***", rep(" ",2),
+                                    "*","**")
+tab_signif_lin[19,c(2,4,7,9:15)] <- s_10$coefficients[c(1:3,5:10,4),"Estimate"]
+tab_signif_lin[20,c(4,7,9:15)] <- c("***", rep("**",2), " ", ".", "*",
+                                    rep(" ",2), "**")
+knitr::kable(tab_signif_lin, align='c')
+write.csv2(tab_signif_lin, "T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/param_mod_lin_AGB.csv")
+# Table pour modèles en loi de puissance
+tab_signif_log <- matrix(" " ,30, 15)
+colnames(tab_signif_log) <- c("Eq.", "(Intercept)", "log(D^2)",
+                              "log(D^2.Ht_m)", "log(D^2.Hf_m)",
+                              "log(D^2.Hc_m)", "log(D^2.meanHcCdia_m)",
+                              "N_tiges","Age", "N_arbres",
+                              "I_cD", "I_cI", "I_cS", "V_c", "CF")
+tab_signif_log <- as.data.frame(tab_signif_log)
+tab_signif_log$Eq. <- rep(11:25, each=2)
+tab_signif_log[1,c(2,3,15)] <- c(s_11$coefficients[,"Estimate"], CF_11)
+tab_signif_log[2,c(2,3)] <- "***"
+tab_signif_log[3,c(2,4,15)] <- c(s_12$coefficients[,"Estimate"], CF_12)
+tab_signif_log[4,c(2,4)] <- "***"
+tab_signif_log[5,c(2,4,8,15)] <- c(s_13$coefficients[,"Estimate"], CF_13)
+tab_signif_log[6,c(2,4,8)] <- c(rep("***",2), "")
+tab_signif_log[7,c(2,4,8,9,15)] <- c(s_14$coefficients[,"Estimate"], CF_14)
+tab_signif_log[8,c(2,4,8,9)] <- c(rep("***",2)," ", "**")
+tab_signif_log[9,c(2,4,8:13,15)] <- c(s_15$coefficients[,"Estimate"], CF_15)
+tab_signif_log[10,c(2,4,8:11)] <- c("*","***"," ", ".", "*", "*")
+tab_signif_log[11,c(2,5,6,15)] <- c(s_16$coefficients[,"Estimate"], CF_16)
+tab_signif_log[12,c(2,5,6)] <- c("***", "**", "***")
+tab_signif_log[13,c(2,5,7,15)] <- c(s_17$coefficients[,"Estimate"], CF_17)
+tab_signif_log[14,c(2,5,7)] <- c("***","*", "***")
+tab_signif_log[15,c(2,5,6,8,15)] <- c(s_18$coefficients[,"Estimate"], CF_18)
+tab_signif_log[16,c(2,5,6,8)] <- c("***","***","***", "*")
+tab_signif_log[17,c(2,5,7,8,15)] <- c(s_19$coefficients[,"Estimate"], CF_19)
+tab_signif_log[18,c(2,5,7)] <- c("***","*","***")
+tab_signif_log[19,c(2,5,6,8:9,15)] <- c(s_20$coefficients[,"Estimate"], CF_20)
+tab_signif_log[20,c(2,5,6)] <- c("*", "***","***")
+tab_signif_log[21,c(2,5,8:9,14,15)] <- c(s_21$coefficients[c(1,2,4,5,3),
+                                                        "Estimate"], CF_21)
+tab_signif_log[22,c(2,5,14)] <- "***"
+tab_signif_log[23,c(2,5,7,8:9,15)] <- c(s_22$coefficients[,"Estimate"], CF_22)
+tab_signif_log[24,c(2,5,7)] <- c("**", "*", "***")
+tab_signif_log[25,c(2,5,6,8:13,15)] <- c(s_23$coefficients[,"Estimate"], CF_23)
+tab_signif_log[26,c(2,5,6,11,13)] <- c("*", "***", "***", "**", ".")
+tab_signif_log[27,c(2,5,7,8:13,15)] <- c(s_24$coefficients[,"Estimate"], CF_24)
+tab_signif_log[28,c(2,5,7,10:11)] <- c(".","**", "***", ".", "*")
+tab_signif_log[29,c(2,5,8:14,15)] <- c(s_25$coefficients[c(1,2,4:9,3),"Estimate"],
+                                    CF_25)
+tab_signif_log[30,c(2,5,11:14)] <- c("***", "**", "**", "*","**", "***")
+knitr::kable(tab_signif_log, align='c')
+write.csv2(tab_signif_log, "T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/param_mod_log_AGB.csv")
+```
+
+![Code de signification](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/signif_code.png){height=200px}
+  
+Les codes de signification dans R sont un moyen de mesurer le niveau de signification d'un résultat d'analyse statistique. Ces codes sont représentés par des astérisques (*) et indiquent le niveau de confiance dans les résultats, un nombre plus élevé d'astérisques représentant un niveau de signification plus élevé.
+
+### Critères de sélection 
+
+On sélectionne les modèles les plus pertinents selon quatre critères :
+
+- Le critère d'information d'Akaike: $AIC=2k - 2ln(L)$, où $k$ est le nombre de paramètres à estimer du modèle et $L$ est le maximum de la fonction de vraisemblance du modèle.
+- Le critère d'information bayésien: $BIC=2ln(N) -2ln(L)$, avec $L$ la vraisemblance du modèle estimée, 
+$N$ le nombre d'observations dans l'échantillon et $k$ le nombre de paramètres libres du modèle.
+- La racine de l'erreur quadratique moyenne (root-mean-square error): $RMSE=\sqrt{\frac{1}{N}\sum_{i=1}^N(AGB_i-\widehat{AGB_i})^2}$, avec $N$ le nombre d'observations dans l'échantillon, $\widehat{V_i}$ la biomasse aérienne de l'arbre $i$ et $V_i$ sa biomasse aérienne observée. 
+- Le coefficient de détermination linéaire de Pearson: $R^2=1-\frac{\sum_{i=1}^N(AGB_i-\widehat{AGB_i})^2}{\sum_{i=1}^N(AGB_i-\overline{AGB_i})^2}$, , avec $N$ le nombre d'observations dans l'échantillon, $\widehat{AGB_i}$ le volume estimé de l'arbre $i$, $AGB_i$ sa biomasse aérienne observée et $\overline{AGB_i}$, la moyenne des biomasses aériennes observées sur le terrain.   
+- L'écart type des résidus $\hat{\sigma}$, estimé pour une régression linéaire de la forme $y_i=\beta x_i + \epsilon_i$ avec $\epsilon_i \sim \mathcal{N}(0,\sigma^2)$.
+
+Le modèle qui sera sélectionné est celui qui minimise les critères $AIC$, $BIC$ et $RMSE$ et dont le $R^2$ et le plus proche de 1.
+
+
+```{r comparaison-mod-AGB, echo=FALSE, inlcude=TRUE}
+tab <- data.frame(Eq.=c(1:10,"8 + domaine", "8 + domaine rand",
+                        11:25, "24 + domaine", "24 + domaine rand",
+                        "17 + domaine", "17 + domaine rand"),
+                  RMSE=NA, AIC=NA, BIC=NA, R_squared=NA, Sigma=NA,
+                  type=c(rep("linéaire", 12), rep("logarithmique", 19)))
+tab$RMSE <- round(c(unlist(mget(paste0("RMSE_", 1:10))),
+                    RMSE_8_site, RMSE_8_site_rand,
+              unlist(mget(paste0("RMSE_", 11:25))),
+              RMSE_24_site, RMSE_24_site_rand,
+              RMSE_17_site, RMSE_17_site_rand),5)
+tab$AIC <- round(c(unlist(mget(paste0("AIC_", 1:10))),
+                   AIC_8_site, AIC_8_site_rand, 
+             unlist(mget(paste0("AIC_", 11:25))),
+              AIC_24_site, AIC_24_site_rand,
+             AIC_17_site, AIC_17_site_rand),4)
+tab$BIC <- round(c(unlist(mget(paste0("BIC_", 1:10))), BIC_4_site, BIC_4_site_rand,
+             unlist(mget(paste0("BIC_", 11:25))),
+             BIC_24_site, BIC_24_site_rand, BIC_17_site,
+             BIC_17_site_rand),4)
+tab$R_squared <- round(c(unlist(mget(paste0("Rsquared_", 1:10))),
+                   Rsquared_8_site, Rsquared_8_site_rand,
+                   unlist(mget(paste0("Rsquared_", 11:25))),
+                   Rsquared_24_site, Rsquared_24_site_rand,
+                   Rsquared_17_site, Rsquared_17_site_rand),4)
+s_all <- unlist(mget(paste0("s_", 1:25)))
+Sigma <- unlist(s_all[grep("sigma", names(s_all))])
+tab$Sigma <- c(Sigma[1:10], s_8_site$sigma, s_8_site_rand$sigma,
+               Sigma[11:25], s_24_site$sigma, s_24_site_rand$sigma,
+                   s_17_site$sigma, s_17_site_rand$sigma)
+knitr::kable(tab)
+
+min_AIC_lin <- tab$Eq.[tab$AIC==min(tab$AIC[tab$type=="linéaire"])]
+min_BIC_lin <- tab$Eq.[tab$BIC==min(tab$BIC[tab$type=="linéaire"])]
+min_AIC_log <- tab$Eq.[tab$AIC==min(tab$AIC[tab$type!="linéaire"])]
+min_BIC_log <- tab$Eq.[tab$BIC==min(tab$BIC[tab$type!="linéaire"])]
+min_RMSE <- tab$Eq.[tab$RMSE==min(tab$RMSE)]
+max_R2 <- tab$Eq.[tab$R_squared==max(tab$R_squared)]
+```
+
+Pour que les valeurs de l’AIC (ou BIC) soient comparables, tous les modèles 
+doivent avoir la même variable réponse. 
+
+On ne peut donc pas comparer des modèles où la réponse est AGB (type=linéaire),
+avec d’autres où la réponse est log(AGB) (type=logarithmique). 
+
+
+On peut en revanche comparer les RMSE entre tous les modèles, car ils ont été 
+calculés à partir des valeurs ajustées, retransformées à l’échelle normale, pour 
+les modèles logarithmiques.   
+
+Le modèle linéaire qui minimise le critère AIC est le `r min_AIC_lin`, celui qui minimise le BIC est le `r min_BIC_lin`.
+
+Le modèle logarithmique qui minimise le critère AIC est le `r min_AIC_log`, celui qui minimise le BIC est le `r min_BIC_log`.
+
+Parmi tous les modèles, celui qui présente le plus faible RMSE est le `r min_RMSE` et celui dont le $R^2$ est le plus proche de 1 est le `r max_R2`. 
+
+La différence étant négligeable (<5) entre les BIC des modèles 8,9 et 5, et le RMSE des modèles 8 et 9 étant très proches et plus faible que celui du 5, on peut retenir ces modèles, sans prendre en compte l'effet domaine qui n'est pas significatif.
+
+De plus le modèle 8 prend en compte le DBH et la hauteur totale de l'arbre en plus de son nombre de tiges de , son âge, sa classe de couronne ainsi que le nombre d'arbres dans le voisinage, tandis que le modèle 9 nécessite une mesure supplémentaire de hauteur car il prend en compte la hauteur du fût ainsi que la profondeur de la couronne de l'arbre, dont la délimitation n'est souvent pas facile à distinguer sur le terrain.  On peut donc choisir le modèle 8, qui est le plus parcimonieux parmi les modèles retenus, en fonction des critères de sélection. En effet, le modèle 8 présente le deuxième RMSE le plus faible après le 9 et l'incertitude sur les valeurs de hauteur de fût et de profondeur de couronne mesurées sur le terrain utilisées pour ajuster le modèle  9, nous pousse à préférer le 8 ajusté sur des données plus fiables.   
+
+De plus le modèle 8 rempli les critères du paragraphe 6 de [l'outil méthodologique A/R](https://cdm.unfccc.int/methodologies/ARmethodologies/tools/ar-am-tool-18-v1.0.1.pdf): Démontrer la pertinence des équations de volume pour l'estimation de la biomasse aérienne des arbres dans les activités de projet A/R CDM.
+En effet l'équation a été dérivée d'un ensemble de données d'au moins 30 arbres échantillonnés (n=54), et la valeur du coefficient de détermination (R2) obtenue (0.9832) est supérieure ou égale à 0,85.
+
+### Equations allométrique retenues
+
+Finalement, les modèles que l'on peut retenir sont détaillés ci-dessous : 
+
+- $Eq.4: \ \ AGB=-0.0022225282 + 0.0001687149\times D^2 -0.0000029508 \times D^3 + 0.2334845979 \times D^2\times H_f + 0.1945873594 \times D^2\times H_c $
+
+- $Eq.5: \ \ AGB=-0.002515747391 + 0.000177153382 \times D^2 -0.000004097279 \times D^3 + 0.212153211048\times D^2\times H_t $
+
+- $Eq.6: \ \ AGB=-0.001732762202 + 0.000190026792 \times D^2 -0.000003840479 \times D^3 + 0.203101400480 \times D^2\times H_t -0.000927423889 \times N_{tiges}$
+
+- $Eq.7:  \ \  AGB=0.003891642536 + 0.000194867354\times D^2 -0.000005581081 \times D^3 + 0.225631051729 \times D^2\times H_t -0.001195239606 \times N_{tiges} -0.000146480153 \times Age$
+
+- $Eq.8:  \ \  AGB=0.013509873041 + 0.000229759985 \times D^2 -0.000008367684 \times D^3 + 0.233060585677 \times D^2\times H_t -0.001951841599 \times N_{tiges} -0.000187453763 \times Age -0.003341869392 \times N_{arbres} + \beta_{I_c}$, avec $\beta_{I_c} = \begin{cases} 0.009470294305 & si \ I_c=D \\ 0.005132776052 & si \ I_c=I \\ 0.002717530219 & si \ I_c=S \end{cases}$
+
+- $Eq.9:  \ \ AGB=0.014320637686 + 0.000227161613 \times D^2 -0.000007789866 \times D^3 + 0.248918029257 \times D^2\times H_f + 0.222853281008 \times D^2\times H_c -0.002022817266 \times N_{tiges} -0.000204664589 \times Age -0.003345436585 \times N_{arbres} + \beta_{I_c}$, tel que $\beta_{I_c} = \begin{cases} 0.009177866431 & si \ I_c=D \\ 0.005155935033 & si \ I_c=I \\ 0.002974893620 & si \ I_c=S \end{cases}$
+
+- $Eq.10:  \ \  AGB=0.00708665095 + 0.00031510981 \times D^2 + 0.16344138020 \times D^2\times H_f 0.00008476632 \times V_c -0.00593709846 \times N_{tiges} + 0.00000637269 \times Age -0.00321777877 \times N_{arbres} + \beta_{I_c}$, avec $\beta_{I_c} = \begin{cases} 0.00918988607 & si \ I_c=D \\ 0.00669843031 & si \ I_c=I \\ -0.00354436257 & si \ I_c=S \end{cases}$  
+
+avec
+
+- $Age$ en mois 
+- $D$ en cm
+- $D^2\times H_t$, $D^2\times H_f$ et $D^2\times H_c$ en m 
+- $AGB$ en $tms$
+
+## Comparaison des modèles retenus avec ceux de la littérature 
+
+### RMSE 
+
+```{r comp_bib_AGB}
+# Biomass expansion factor 
+# (Miyakuni et al. 2004, Allometric Biomass Equations, Biomass Expansion Factors and Root-to-shoot Ratios of Planted Acacia mangium Willd. Forests in West Java, Indonesia)
+BEFMang_old <- 1.332
+# Densité spécifique du mangium (g/cm^3)
+DMang <- 0.507
+DMang_kgcm3 <- DMang/1000
+DMang_kgm3 <- DMang*1000
+# Calcul de l'AGB à partir du volume issu des tarifs de cubage de Peroches
+AGB_hat_Peroches1 <- 0.60983*((data$DHP*pi)^2/10000)^1.338*DMang_kgm3*BEFMang_old/1000
+RMSE_Peroches1 <- sqrt(mean((AGB_hat_Peroches1-data$AGB)^2))
+AGB_hat_Peroches2 <- 0.03349*((data$DHP*pi)^2*data$H_t/10000)^1.141*DMang_kgm3*BEFMang_old/1000
+RMSE_Peroches2 <- sqrt(mean((AGB_hat_Peroches2-data$AGB)^2))
+# Pour le calcul du volume de bois selon Bernhard (1993) on a besoin des circonférences à 10cm
+# qu'on a importé précédemment 
+# Les équations de l'article donnent le poids de bois et le poids de feuille en kg,
+# On somme les poids de bois et de feuille pour obtenir l'AGB (kg) et on converti en tms
+# AGB_hat_Bernhard <- (19.2 + 3.57*10^(-4)*(data$dhp_10cm*pi)^3)/1000 + 
+#   0.25+(2.69*10^(-5)*(data$dhp_10cm*pi)^3)/1000
+# Résultats éloignés des autres modèles on considère que le poids du bois finalement
+AGB_hat_Bernhard <- (19.2 + 3.57*10^(-4)*(data$dhp_10cm*pi)^3)/1000 
+
+RMSE_Bernhard <- sqrt(mean((AGB_hat_Bernhard-data$AGB)^2))
+tab_comp <- data.frame(Modèle=c("Equation une entrée (Bernhard)",
+                                "Tarif une entrée (Peroches)",
+                                "Tarif deux entrées (Peroches)",
+                                "Eq. 5", "Eq. 8", "Eq. 9"),
+                       RMSE=round(c(RMSE_Bernhard,
+                                    RMSE_Peroches1, RMSE_Peroches2, 
+                                    RMSE_5, RMSE_8, RMSE_9),4),
+                       'Validité Circ (cm)'=c("24-94", "12-70","12-70",
+                                              rep("14-75", 3)),
+                       'Validité H_t (m) '=c("X", "X", "5.4-11",
+                                             rep("4.7-19.8", 3)),
+                       'Validité N_tiges'=c(rep("X", 4),
+                                            rep(paste0(min(data$N_tiges),"-",
+                                                   max(data$N_tiges)),2)),
+                       'Validité Age (mois)'=c(rep("X", 4),
+                                               rep(paste0(min(data$Age),"-",
+                                                      max(data$Age)),2)),
+                       'Validité N_abres '=c(rep("X", 4),
+                                               rep(paste0(min(data$N_arbres),"-",
+                                                      max(data$N_arbres)),2)))
+
+knitr::kable(tab_comp)
+```
+
+### Résultats 
+
+```{r plots_comp-AGB}
+knitr::opts_chunk$set(echo = FALSE,
+                      include=TRUE,
+                      fig.align="center",
+                      fig.width = 9,
+                      fig.height = 9,
+                      out.width = '100%',
+                      highlight = TRUE)
+AGB_hat <- data.frame(AGB_hat=c(AGB_hat_Peroches1, AGB_hat_Peroches2,
+                                AGB_hat_Bernhard,
+                           mod_5$fitted.values, mod_8$fitted.values,
+                           mod_9$fitted.values),
+                   Modèle=rep(c("Tarif une entrée (Peroches)",
+                                "Tarif deux entrées (Peroches)",
+                                "Equation une entrée (Bernhard)",
+                                 "Eq. 5 (deux entrées)",
+                                 "Eq. 8 (six entrées)",
+                                 "Eq. 9 (sept entrées)"),
+                               each=length(AGB_hat_Peroches1)),
+                   AGB_obs=rep(data$AGB,6),
+                   Domaine=rep(data$Domaine,6),
+                   Campagne=rep(data$Campagne,6))
+
+ggplot(data=AGB_hat, aes(x=AGB_obs, y=AGB_hat, color=Modèle))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red", linetype="dashed") +
+  stat_smooth(method="lm", fullrange = TRUE, se=FALSE)+
+  ggtitle(label=("AGB estimées selon différents tarifs de cubage
+  en fonction des AGB observées")) +
+  labs(y = "AGB estimée (tms)",
+       x = "AGB observée (tms)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+
+##############################"on refait le graphique######################
+knitr::opts_chunk$set(echo = FALSE,
+                      include=TRUE,
+                      fig.align="center",
+                      fig.width = 9,
+                      fig.height = 9,
+                      out.width = '100%',
+                      highlight = TRUE)
+
+# Filtrer les modèles demandés
+AGB_hat_filtered <- AGB_hat %>%
+  filter(Modèle %in% c("Tarif une entrée (Peroches)",
+                       "Tarif deux entrées (Peroches)",
+                       "Equation une entrée (Bernhard)",
+                       "Eq. 8 (six entrées)"))
+
+# Créer le graphique
+ggplot(data=AGB_hat_filtered, aes(x=AGB_obs, y=AGB_hat, color=Modèle)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color="red", linetype="dashed") +
+  stat_smooth(method="lm", fullrange = TRUE, se=FALSE) +
+  ggtitle(label=("AGB estimées selon différents tarifs de cubage\n en fonction des AGB observées")) +
+  labs(y = "AGB estimée (tms)",
+       x = "AGB observée (tms)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+
+###########################################graphique refait###########################""
+
+
+
+ggplot(data=AGB_hat, aes(x=AGB_obs, y=AGB_hat, color=Modèle, shape=Domaine))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red", linetype="dashed") +
+  ggtitle(label=("AGB  estimées selon différents tarifs de cubage
+  en fonction des AGB observées distingués par domaine")) +
+  labs(y = "AGB estimée (tms)",
+       x = "AGB observée (tms)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+
+ggplot(data=AGB_hat[AGB_hat$Domaine!="Ibina",],
+       aes(x=AGB_obs, y=AGB_hat, color=Modèle, shape=Campagne))+
+  geom_point()+
+  geom_abline(intercept =0, slope = 1, color="red", linetype="dashed") +
+  ggtitle(label=("AGB estimées selon différents tarifs de cubage
+  en fonction des AGB observées pour les arbres plantés en 2021")) +
+  labs(y = "AGB estimée (tms)",
+       x = "AGB observée (tms)") +
+  theme(plot.title = element_text(size=12.5, face="bold", hjust = 0.5))
+
+```
+
+# Facteur d'expansion de la biomasse (FEB)
+
+Les méthodes alternatives employées pour obtenir des estimations de la biomasse des arbres sont :
+
+- Méthode indirecte d’évaluation de la biomasse aérienne : produit de la biomasse du tronc, déduite du volume du tronc mesuré, converti en masse en considérant la densité spécifique ($\rho$), des A. mangium, puis multipliée par le facteur d'expansion de la biomasse (FEB) sans unité  :
+$AGB= V \times \rho\times FEB$ ou $AGB=V \times FECB$ avec $FECB$ le facteur de d'expansion et conversion de la biomasse en $kg/m^3$. 
+- Méthode directe par ajustement des équations de biomasse à partir des données par arbre d'un inventaire, réalisée dans la partie précédente. 
+
+Les facteurs de biomasse étant plus faciles à utiliser que les équations de biomasse, ils sont souvent préférés dans littérature. 
+
+De plus le facteur d'expansion de la biomasse peut être estimé en tant qu'une variable réponse dépendant de variables explicatives (age, hauteur, DHP...) ou bien comme une constante en considérant la pente du modèle linéaire donnant la biomasse en fonction du volume de bois des arbres
+
+## Ajustement des modèles 
+
+### Définition des modèles envisagés
+
+En s'inspirant de l'article @Sanquetta2011, on choisit d'ajuster des modèles prenant en compte différentes variables explicatives pour l'estimation du FEB ou du FECB. Les modèles ajustés les plus complexes sont de la forme :
+
+![Modèles ajustés pour le FEB](T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/fig/tab_mod_FEB.png){height=1500px}
+  
+avec :  
+FEB : facteur d’expansion de la biomasse des A. *mangium*,  
+D : DHP (cm) ou somme quadratique des diamètres des tiges mesurées,  
+H_t : hauteur totale de l'arbre (m),  
+H_f : hauteur du fût de l’arbre (m),  
+H_c : profondeur de la couronne de l’arbre (m),   
+C_dia : diamètre de la couronne de l’arbre (m), 
+$D^2\times H_t$, $D^2\times H_f$, $D^2\times H_c$, $D^2\times \frac{H_c + C_{dia}}{2}$ (m),   
+I_c : classe de la couronne (I_c=D, C, I ou S), indiquant la position de l’arbre dans la canopée,  
+N_tiges : nombre de tiges pour lesquelles le diamètre a été mesuré,  
+N_arbres : nombre d’arbres vivants présents dans un rayon de 4m autour de celui considéré,   
+A : âge de la plantation (mois),    
+CF : facteur de correction du biais [@Baskerville_1972].
+
+Pour chacune des  ces six formes de modèle, on procède à une sélection pas à pas, à l'aide la fonction `stepAIC` du package `MASS`, afin d'identifier le modèle le plus pertinent et parcimonieux, en fonction du critère AIC.
+
+### Estimation du facteur de d'expansion de la biomasse (FEB)
+
+#### Estimation d'un FEB constant
+
+On ajuste un modèle de régression de l'AGB (kg) en fonction du poids de bois (kg) calculé en multipliant le volume de bois par la densité du bois des *A. mangium*, issue de la littérature. On impose à la régression, une ordonnée à l'origine (Intercept) nul car il est réaliste de considérer qu'un arbre dont le poids de bois est nul n'ait aucune biomasse. 
+
+```{r FEB_cst}
+mod <- lm(I(AGB*1000)~I(Vt_bois*DMang_kgm3)-1, data)
+s <- summary(mod)
+s
+par(mfrow=c(1,2))
+plot(mod,1)
+plot(mod,2)
+par(mfrow=c(1,1))
+ggplot(data, aes(x = AGB*1000, y = Vt_bois)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(title = "Modèle linéaire : Biomasse aérienne (AGB) vs Volume de bois",
+       x = "AGB (kg)", y = "V (m3)")
+```
+
+On obtient donc un BEF de **1.30192**, ce qui correspond à la valeur de BEF issue de l'article @miyakuni_allometric_2004 de 1.332, estimée pour des *A. mangium* entre 3 et 10 ans plantés en Indonésie. 
+
+
+#### Ajustement des modèles polynomiaux 
+
+```{r FEB-poly, echo=TRUE, include=FALSE}
+ggplotRegression <- function(mod, num){
+  g <- ggplot(mod$model, aes(x=mod$fitted.values, y=mod$model[,1]))+
+    geom_point()+
+    stat_smooth(method="lm", col='blue')+
+    ggtitle(label=paste("Modèle ", num, "FEB vs",
+                        toString(names(mod$model)[-1])),
+            subtitle=paste("R2=", signif(summary(mod)$r.squared),
+                           ", RMSE=", signif(sqrt(mean(mod$residuals^2))),
+                           ", AIC=", signif(AIC(mod)),
+                           ", BIC=", signif(BIC(mod))))+
+    labs(x = "FEB estimé",
+         y = "FEB observé")+
+    theme(plot.subtitle = element_text(size=9.5, face="bold"),
+          plot.title = element_text(size=10.5, face="bold"))
+  par(mfrow=c(1,2))
+  plot(mod,1)
+  plot(mod,2)
+  par(mfrow=c(1,1))
+  g
+}
+# FEB observé
+data$FEB <- data$AGB*1000/(data$Vt_bois*DMang_kgm3)
+# Ajuster les modèles et visualiser les résultats
+## Eq.1
+mod_1 <- lm(FEB~ DHP + log(H_t*Age*DHP) + log(H_t) + N_tiges + Age + N_arbres + I_c , data)
+s_1 <- summary(mod_1)
+s_1
+RMSE_1 <- sqrt(mean(mod_1$residuals^2))
+Rsquared_1 <- s_1$r.squared
+AIC_1 <- AIC(mod_1)
+BIC_1 <- BIC(mod_1)
+ggplotRegression(mod_1, 1)
+# Performs stepwise model selection by AIC.
+mod_1_stepwise_selected <- MASS::stepAIC(mod_1, trace=FALSE)
+s_1s <- summary(mod_1_stepwise_selected)
+s_1s
+RMSE_1s <- sqrt(mean(mod_1_stepwise_selected$residuals^2))
+Rsquared_1s <- s_1s$r.squared
+AIC_1s <- AIC(mod_1_stepwise_selected)
+BIC_1s <- BIC(mod_1_stepwise_selected)
+ggplotRegression(mod_1_stepwise_selected, 1)
+
+## Eq.2
+mod_2 <- lm(FEB~ DHP + log(H_f*Age*DHP) + log(H_c*Age*DHP) + log(H_f) + log(H_c)
+            + N_tiges + Age + N_arbres + I_c , data)
+s_2 <- summary(mod_2)
+s_2
+RMSE_2 <- sqrt(mean(mod_2$residuals^2))
+Rsquared_2 <- s_2$r.squared
+AIC_2 <- AIC(mod_2)
+BIC_2 <- BIC(mod_2)
+ggplotRegression(mod_2, 2)
+# Performs stepwise model selection by AIC.
+mod_2_stepwise_selected <- MASS::stepAIC(mod_2, trace=FALSE)
+s_2s <- summary(mod_2_stepwise_selected)
+s_2s
+RMSE_2s <- sqrt(mean(mod_2_stepwise_selected$residuals^2))
+Rsquared_2s <- s_2s$r.squared
+AIC_2s <- AIC(mod_2_stepwise_selected)
+BIC_2s <- BIC(mod_2_stepwise_selected)
+ggplotRegression(mod_2_stepwise_selected, 2)
+# Eq.3
+mod_3 <- lm(FEB~ DHP + log(H_f*Age*DHP) + log(meanHcCdia_m*Age*DHP) + log(H_f) 
+            + log(meanHcCdia_m)  + N_tiges + Age + N_arbres + I_c , data)
+s_3 <- summary(mod_3)
+s_3
+RMSE_3 <- sqrt(mean(mod_3$residuals^2))
+Rsquared_3 <- s_3$r.squared
+AIC_3 <- AIC(mod_3)
+BIC_3 <- BIC(mod_3)
+ggplotRegression(mod_3, 3)
+# Performs stepwise model selection by AIC.
+mod_3_stepwise_selected <- MASS::stepAIC(mod_3, trace=FALSE)
+s_3s <- summary(mod_3_stepwise_selected)
+s_3s
+RMSE_3s <- sqrt(mean(mod_3_stepwise_selected$residuals^2))
+Rsquared_3s <- s_3s$r.squared
+AIC_3s <- AIC(mod_3_stepwise_selected)
+BIC_3s <- BIC(mod_3_stepwise_selected)
+ggplotRegression(mod_3_stepwise_selected, 3)
+```
+
+#### Ajustement des modèles en loi de puissance
+
+```{r FEB-log, echo=TRUE, include=FALSE}
+ggplotLogRegression <- function(mod, FEB_hat, num){
+  require(ggplot2)
+  g <- ggplot(mod$model, aes(x=FEB_hat, y=data$FEB))+
+    geom_point()+
+    stat_smooth(method="lm", col='blue')+
+    ggtitle(label=paste("Modèle ", num,
+                        "FEB vs",
+                        toString(gsub("log", "", names(mod$model)[-1]))),
+            subtitle=paste("R2=", signif(summary(mod)$r.squared),
+                           ", RMSE=", 
+                           signif(sqrt(mean((FEB_hat-data$FEB)^2))),
+                           ", AIC=", signif(AIC(mod)),
+                           ", BIC=", signif(BIC(mod)))) +
+    labs(x = "FEB estimé",
+         y = "FEB observé")+
+    theme(plot.subtitle = element_text(size=9.5, face="bold"),
+          plot.title = element_text(size=10.5, face="bold"))
+  par(mfrow=c(1,2))
+  plot(mod,which=1)
+  plot(mod,which=2)
+  par(mfrow=c(1,1))
+  g
+}
+
+# Eq.4 
+mod_4 <- lm(log(FEB) ~ DHP + log(H_t*Age*DHP) + log(H_t) + log(DHP)
+            + N_tiges + Age + N_arbres + I_c , data)
+s_4 <- summary(mod_4)
+Rsquared_4 <- s_4$r.squared
+AIC_4 <- AIC(mod_4)
+BIC_4 <- BIC(mod_4)
+CF_4 <- exp(mean((mod_4$fitted.values - mod_4$model$`log(FEB)`)^2)/2)
+FEB_hat <- exp(model.matrix(mod_4)[,-c(3:5)] %*% mod_4$coefficients[-c(3:5)])*
+  (data$H_t*data$Age*data$DHP)^mod_4$coefficients[3]*
+  (data$H_t)^mod_4$coefficients[4]*
+  (data$DHP)^mod_4$coefficients[5]*CF_4
+RMSE_4 <- sqrt(mean((FEB_hat - data$FEB)^2))
+ggplotLogRegression(mod_4, FEB_hat, 4)
+# Performs stepwise model selection by AIC.
+mod_4_stepwise_selected <- MASS::stepAIC(mod_4, trace=FALSE)
+s_4s <- summary(mod_4_stepwise_selected)
+Rsquared_4s <- s_4s$r.squared
+AIC_4s <- AIC(mod_4_stepwise_selected)
+BIC_4s <- BIC(mod_4_stepwise_selected)
+CF_4s <- exp(mean((mod_4_stepwise_selected$fitted.values - mod_4_stepwise_selected$model$`log(FEB)`)^2)/2)
+FEB_hat <- exp(mod_4_stepwise_selected$coefficients[1])*
+  (data$H_t)^mod_4_stepwise_selected$coefficients[2]*
+  (data$DHP)^mod_4_stepwise_selected$coefficients[3]*CF_4s
+RMSE_4s <- sqrt(mean((FEB_hat - data$FEB)^2))
+ggplotLogRegression(mod_4_stepwise_selected, FEB_hat, 4)
+
+# Eq.5
+mod_5 <- lm(log(FEB)~ DHP + log(H_f*Age*DHP) +  log(H_c*Age*DHP) +
+              log(H_f) + log(H_c) + log(DHP)
+            + N_tiges + Age + N_arbres + I_c , data)
+s_5<- summary(mod_5)
+# Paramètre associé à log(H_c) indéfini (NA) en raison de la colinéarité des variables explicatives du modèle complet
+Rsquared_5<- s_5$r.squared
+AIC_5<- AIC(mod_5)
+BIC_5 <- BIC(mod_5)
+CF_5 <- exp(mean((mod_5$fitted.values - mod_5$model$`log(FEB)`)^2)/2)
+FEB_hat <- exp(model.matrix(mod_5)[,-c(3:7)] %*% mod_5$coefficients[-c(3:7)])*
+  (data$H_f*data$Age*data$DHP)^mod_5$coefficients[3]*
+  (data$H_c*data$Age*data$DHP)^mod_5$coefficients[4]*
+  (data$H_f)^mod_5$coefficients[5]*
+  (data$DHP)^mod_5$coefficients[7]*CF_5
+RMSE_5 <- sqrt(mean((FEB_hat - data$FEB)^2))
+ggplotLogRegression(mod_5, FEB_hat, 5)
+# Performs stepwise model selection by AIC.
+mod_5_stepwise_selected <- MASS::stepAIC(mod_5, trace=FALSE)
+s_5s <- summary(mod_5_stepwise_selected)
+Rsquared_5s <- s_5s$r.squared
+AIC_5s <- AIC(mod_5_stepwise_selected)
+BIC_5s <- BIC(mod_5_stepwise_selected)
+CF_5s <- exp(mean((mod_5_stepwise_selected$fitted.values - mod_5_stepwise_selected$model$`log(FEB)`)^2)/2)
+FEB_hat <- exp(model.matrix(mod_5_stepwise_selected)[,-c(2:4)] %*% mod_5_stepwise_selected$coefficients[-c(2:4)])*
+  (data$H_c*data$Age*data$DHP)^mod_5_stepwise_selected$coefficients[2]*
+  (data$H_f)^mod_5_stepwise_selected$coefficients[3]*
+  (data$DHP)^mod_5_stepwise_selected$coefficients[4]*CF_5s
+RMSE_5s <- sqrt(mean((FEB_hat - data$FEB)^2))
+ggplotLogRegression(mod_5_stepwise_selected, FEB_hat, 5)
+
+# Eq.6
+mod_6 <- lm(log(FEB) ~ DHP + log(H_f*Age*DHP) + log(meanHcCdia_m*Age*DHP)
+            + log(DHP) + log(H_f) + log(meanHcCdia_m) +
+            + N_tiges + Age + N_arbres + I_c, data)
+s_6<- summary(mod_6)
+# Paramètre associé à log(meanHcCdia_m)  indéfini (NA) en raison de la colinéarité des variables explicatives du modèle complet
+Rsquared_6<- s_6$r.squared
+AIC_6<- AIC(mod_6)
+BIC_6 <- BIC(mod_6)
+CF_6 <- exp(mean((mod_6$fitted.values - mod_6$model$`log(FEB)`)^2)/2)
+FEB_hat <- exp(model.matrix(mod_6)[,-c(3:7)] %*% mod_6$coefficients[-c(3:7)])*
+  (data$H_f*data$Age*data$DHP)^mod_6$coefficients[3]*
+  (data$meanHcCdia_m*data$Age*data$DHP)^mod_6$coefficients[4]*
+  (data$H_f)^mod_6$coefficients[6]*
+  (data$DHP)^mod_6$coefficients[5]*CF_6
+RMSE_6 <- sqrt(mean((FEB_hat - data$FEB)^2))
+ggplotLogRegression(mod_6, FEB_hat, 6)
+# Performs stepwise model selection by AIC.
+mod_6_stepwise_selected <- MASS::stepAIC(mod_6, trace=FALSE)
+s_6s <- summary(mod_6_stepwise_selected)
+Rsquared_6s <- s_6s$r.squared
+AIC_6s <- AIC(mod_6_stepwise_selected)
+BIC_6s <- BIC(mod_6_stepwise_selected)
+CF_6s <- exp(mean((mod_6_stepwise_selected$fitted.values - mod_6_stepwise_selected$model$`log(FEB)`)^2)/2)
+FEB_hat <- exp(mod_6_stepwise_selected$coefficients[1])*
+  (data$meanHcCdia_m*data$Age*data$DHP)^mod_6_stepwise_selected$coefficients[2]*
+  (data$H_f)^mod_6_stepwise_selected$coefficients[3]*CF_6s
+RMSE_6s <- sqrt(mean((FEB_hat - data$FEB)^2))
+ggplotLogRegression(mod_6_stepwise_selected, FEB_hat, 6)
+```
+
+## Sélection de modèle 
+
+### Identification des variables significatives et paramètres des modèles
+
+```{r signif-mod-FEB, echo=FALSE}
+# Table pour modèles linéaires
+tab_signif_lin <- matrix(" " ,12, 17)
+colnames(tab_signif_lin) <- c("Eq.", "(Intercept)", "D", "log(H_t)", 
+                              "log(H_f)", "log(H_c)", "log((H_c+C_dia)/2)", 
+                              "log(D.Ht.Age)", "log(D.Hf.Age)",
+                              "log(D.Hc.Age)",
+                              "log(D.(H_c+C_dia)/2.Age)",
+                              "N_tiges","Age", "N_arbres",
+                              "I_cD", "I_cI", "I_cS")
+tab_signif_lin <- as.data.frame(tab_signif_lin)
+tab_signif_lin$Eq. <- rep(c(1, "1'", 2, "2'", 3, "3'"), each=2)
+tab_signif_lin[1,c(2,3,8,4,12:17)] <- s_1$coefficients[,"Estimate"]
+tab_signif_lin[4] <- "**"
+tab_signif_lin[3,c(2,3,4)] <- s_1s$coefficients[,"Estimate"]
+tab_signif_lin[4,c(2,3,4)] <- "***"
+tab_signif_lin[5,c(2,3,9,10,5,12:17)] <- s_2$coefficients[,"Estimate"]
+tab_signif_lin[6,c(10,5)] <- c("**",".")
+tab_signif_lin[5,c(2,9,10,5)] <- s_2s$coefficients[,"Estimate"]
+tab_signif_lin[6,c(2,9,10,5)] <- c("***","*","**","**")
+tab_signif_lin[5,c(2,3,9,11,5,12:17)] <- s_3$coefficients[,"Estimate"]
+tab_signif_lin[5,c(2,11,5,14)] <- s_3s$coefficients[,"Estimate"]
+tab_signif_lin[6,c(2,11,5)] <- c("***","**","***")
+knitr::kable(tab_signif_lin, align='c')
+write.csv2(tab_signif_lin, "T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/param_mod_lin_FEB.csv")
+# Table pour modèles en loi de puissance
+tab_signif_log <- matrix(" " ,12, 19)
+colnames(tab_signif_log) <- c("Eq.", "(Intercept)", "D", "log(D)", "log(H_t)", 
+                              "log(H_f)", "log(H_c)", "log((H_c+C_dia)/2)", 
+                              "log(D.Ht.Age)", "log(D.Hf.Age)",
+                              "log(D.Hc.Age)",
+                              "log(D.(H_c+C_dia)/2.Age)",
+                              "N_tiges","Age", "N_arbres",
+                              "I_cD", "I_cI", "I_cS", "CF")
+tab_signif_log <- as.data.frame(tab_signif_log)
+tab_signif_log$Eq. <-  rep(c(4, "4'", 5, "5'", 6, "6'"), each=2)
+tab_signif_log[1,c(2,3,9,5,4,13:19)] <- c(s_4$coefficients[,"Estimate"], CF_4)
+tab_signif_log[3,c(2,5,4,19)] <- c(s_4s$coefficients[,"Estimate"], CF_4s)
+tab_signif_log[4,c(2,5,4)] <- c("***","***","*")
+tab_signif_log[5,c(2,3,10,11,6,4,13:19)] <- c(s_5$coefficients[,"Estimate"], CF_5)
+tab_signif_log[6,c(11)] <- c("*")
+tab_signif_log[7,c(2,11,6,4,13,14,19)] <- c(s_5s$coefficients[,"Estimate"], CF_5s)
+tab_signif_log[8,c(2,11,6,4,13,14)] <- c("***", "**", "***", "*", "", ".")
+
+tab_signif_log[9,c(2,10,12,4,6,8,13:19)] <- c(s_6$coefficients[,"Estimate"], CF_6)
+tab_signif_log[11,c(2,12,6,19)] <- c(s_6s$coefficients[,"Estimate"], CF_6s)
+tab_signif_log[12,c(2,4,8)] <- c("***", "*", "***")
+knitr::kable(tab_signif_log, align='c')
+write.csv2(tab_signif_log, "T:/DossiersTech/Congo/SPF2B/Carbone/Documentation interne/EtudesDendro/Modèles/param_mod_log_FEB.csv")
+```
+
+### Critères de sélection 
+
+```{r comparaison-mod-FEB, echo=FALSE, inlcude=TRUE}
+tab <- data.frame(Eq.=c(1, "1'", 2, "2'", 3, "3'", 4, "4'", 5, "5'", 6, "6'"),
+                  RMSE=NA, AIC=NA, BIC=NA, R_squared=NA, Sigma=NA,
+                  type=c(rep("linéaire", 6), rep("logarithmique", 6)))
+tab$RMSE <- round(c(RMSE_1, RMSE_1s, RMSE_2, RMSE_2s,
+                    RMSE_3, RMSE_3s, RMSE_4, RMSE_4s,
+                    RMSE_5, RMSE_5s, RMSE_6, RMSE_6s),5)
+tab$AIC <- round(c(AIC_1, AIC_1s, AIC_2, AIC_2s,
+                    AIC_3, AIC_3s, AIC_4, AIC_4s,
+                    AIC_5, AIC_5s, AIC_6, AIC_6s),2)
+tab$BIC <- round(c(BIC_1, BIC_1s, BIC_2, BIC_2s,
+                    BIC_3, BIC_3s, BIC_4, BIC_4s,
+                    BIC_5, BIC_5s, BIC_6, BIC_6s),2)
+tab$R_squared <- round(c(Rsquared_1, Rsquared_1s, Rsquared_2, Rsquared_2s,
+                    Rsquared_3, Rsquared_3s, Rsquared_4, Rsquared_4s,
+                    Rsquared_5, Rsquared_5s, Rsquared_6, Rsquared_6s),4)
+tab$Sigma <- round(c(s_1$sigma, s_1s$sigma, s_2$sigma, s_2s$sigma,
+                    s_3$sigma, s_3s$sigma, s_4$sigma, s_4s$sigma,
+                    s_5$sigma, s_5s$sigma, s_6$sigma, s_6s$sigma),5)
+knitr::kable(tab)
+
+min_AIC_lin <- tab$Eq.[tab$AIC==min(tab$AIC[tab$type=="linéaire"])]
+min_BIC_lin <- tab$Eq.[tab$BIC==min(tab$BIC[tab$type=="linéaire"])]
+min_AIC_log <- tab$Eq.[tab$AIC==min(tab$AIC[tab$type!="linéaire"])]
+min_BIC_log <- tab$Eq.[tab$BIC==min(tab$BIC[tab$type!="linéaire"])]
+min_RMSE <- tab$Eq.[tab$RMSE==min(tab$RMSE)]
+max_R2 <- tab$Eq.[tab$R_squared==max(tab$R_squared)]
+```
+
+Pour que les valeurs de l’AIC (ou BIC) soient comparables, tous les modèles 
+doivent avoir la même variable réponse. 
+
+On ne peut donc pas comparer des modèles où la réponse est FEB (type=linéaire),
+avec d’autres où la réponse est log(FEB) (type=logarithmique). 
+
+
+On peut en revanche comparer les RMSE entre tous les modèles, car ils ont été 
+calculés à partir des valeurs ajustées, retransformées à l’échelle normale, pour les modèles logarithmiques.   
+
+Le modèle linéaire qui minimise le critère AIC est le `r min_AIC_lin`, celui qui minimise le BIC est le `r min_BIC_lin`.
+
+Le modèle logarithmique qui minimise le critère AIC est le `r min_AIC_log`, celui qui minimise le BIC est le `r min_BIC_log`.
+
+Parmi tous les modèles, celui qui présente le plus faible RMSE est le `r min_RMSE` et celui dont le $R^2$ est le plus proche de 1 est le `r max_R2`. 
+
+Par conséquent on retient la forme de modèle 4. 
+
+### Modèles retenus
+
+Finalement, les modèles que l'on peut retenir sont détaillés ci-dessous : 
+
+- $Eq.4: \ \ FEB = CF_{4} \times exp(1.846088 -0.009297 \times D -0.037892 \times N_{tiges} + 0.007483 \times Age -0.023678 \times N_{arbres} +  0.047136\times I_{cD} + 0.079624 \times I_{cI} -0.081880 \times I_{cS}) \times  (D \times H_t \times Age)^{ -0.204133}\times H_t^{-0.520449} \times D^{0.580505} =  1.010214 \times  exp(1.846088 -0.009297\times D -0.037892 \times N_{tiges} + 0.007483 \times Age -0.023678 \times N_{arbres} +  0.047136\times I_{cD} + 0.079624 \times I_{cI} -0.081880 \times I_{cS}) \times  (D \times H_t \times Age)^{ -0.204133}\times H_t^{-0.520449}\times D^{0.580505}$
+
+- $Eq.4': FEB = CF_{4'} \times exp(1.21886) \times   H_t^{-0.53418}\times D^{0.17604} = 3.422397 \times   H_t^{-0.53418}\times D^{0.17604}$
+
+# Références 
